@@ -1,0 +1,27 @@
+{
+  "containers": [
+    {
+      "containerNumber": "TCNUS5264906",
+      "containerType": "DC",
+      "containerSize": "40'",
+      "status": "loaded",
+      "cargoWeight": 25000
+    },
+    {
+      "containerNumber": "FITUS673713",
+      "containerType": "DC",
+      "containerSize": "40'",
+      "status": "loaded",
+      "cargoWeight": 25000
+    }
+  ],
+  "fromAddress": "г Новосибирск, п Восточный",
+  "pickupDate": "2025-09-26",
+  "pickupTime": null,
+  "toAddress": "Приморский край, г Уссурийск, с Раковка, д 1П стр 7, офис 1",
+  "deliveryDate": null,
+  "deliveryTime": null,
+  "contacts": "Павлов Виталий, +7 905 082 1414; МАРГАРИТА, 8 924 339 2988",
+  "comments": "Груз: ПЕЛЛЕТЫ. Инструкция по сдаче порожнего контейнера по факту прибытия во Владивосток на ст. Владивосток.",
+  "_verified": true
+}

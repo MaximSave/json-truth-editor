@@ -1,0 +1,34 @@
+{
+  "containers": [
+    {
+      "containerNumber": "TRZU1081499",
+      "containerType": "DC",
+      "containerSize": "40'",
+      "status": "loaded",
+      "cargoWeight": 25000
+    },
+    {
+      "containerNumber": "TNZU4008806",
+      "containerType": "DC",
+      "containerSize": "40'",
+      "status": "loaded",
+      "cargoWeight": 25000
+    },
+    {
+      "containerNumber": "TNZU4014938",
+      "containerType": "DC",
+      "containerSize": "40'",
+      "status": "loaded",
+      "cargoWeight": 25000
+    }
+  ],
+  "fromAddress": "г Владивосток, ул Фанзавод, д 1 стр 3",
+  "pickupDate": "2025-09-18",
+  "pickupTime": null,
+  "toAddress": null,
+  "deliveryDate": null,
+  "deliveryTime": null,
+  "contacts": "Александр Росинский 8 952 083-36-22; Андрей +7 914 664 12 20; Александр +7 908 997 56 71",
+  "comments": "Инструкции по сдаче порожнего запросить на почту empty@transitllc.ru. Заявка делается за 2-е суток до сдачи порожнего. По истечению срока необходимо запросить повторно.",
+  "_verified": true
+}
