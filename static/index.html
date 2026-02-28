@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON Truth Editor</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-primary: #0a0a0f;
+    --bg-card: #12121a;
+    --bg-elevated: #1a1a28;
+    --bg-hover: #222236;
+    --bg-input: #0e0e18;
+    --border: #2a2a3e;
+    --border-bright: #3a3a5e;
+    --border-focus: #6366f1;
+    --text-primary: #e8e8f0;
+    --text-secondary: #8888a8;
+    --text-muted: #555570;
+    --accent-blue: #6366f1;
+    --accent-cyan: #22d3ee;
+    --accent-green: #34d399;
+    --accent-yellow: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #a78bfa;
+    --glow-blue: rgba(99,102,241,0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--bg-primary); color: var(--text-primary);
+    font-family: 'Space Grotesk', sans-serif;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 20% 0%, var(--glow-blue) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 100%, rgba(34,211,238,0.08) 0%, transparent 50%);
+    pointer-events: none; z-index: 0;
+  }
+  .layout { display: flex; flex-direction: column; height: 100vh; position: relative; z-index: 1; }
+
+  /* ---- Top Bar ---- */
+  .top-bar {
+    display: flex; align-items: center; gap: 16px; padding: 10px 20px;
+    border-bottom: 1px solid var(--border); background: var(--bg-card); flex-shrink: 0;
+  }
+  .top-bar h1 {
+    font-size: 20px; font-weight: 700;
+    background: linear-gradient(135deg, #a78bfa, #22d3ee);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    white-space: nowrap;
+  }
+  .spacer { flex: 1; }
+
+  /* ---- Buttons ---- */
+  .btn {
+    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--text-primary); cursor: pointer;
+    font: 600 12px 'Space Grotesk', sans-serif; transition: all 0.2s;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--border-bright); background: var(--bg-elevated); }
+  .btn:disabled { opacity: 0.4; cursor: default; }
+  .btn.primary { border-color: var(--accent-blue); background: rgba(99,102,241,0.15); }
+  .btn.primary:hover { background: rgba(99,102,241,0.25); }
+  .btn.danger { border-color: var(--accent-red); color: var(--accent-red); }
+  .btn.danger:hover { background: rgba(248,113,113,0.1); }
+  .btn.save { border-color: var(--accent-green); color: var(--accent-green); }
+  .btn.save:hover { background: rgba(52,211,153,0.12); }
+  .btn.sm { padding: 4px 10px; font-size: 11px; }
+  .btn.icon-btn { padding: 7px 10px; font-size: 16px; }
+
+  /* ---- Main area ---- */
+  .main-area { display: flex; flex: 1; overflow: hidden; }
+
+  /* ---- Sidebar ---- */
+  .sidebar {
+    width: 260px; min-width: 0; border-right: 1px solid var(--border);
+    background: var(--bg-card); display: flex; flex-direction: column;
+    flex-shrink: 0; overflow: hidden; transition: width 0.25s ease;
+  }
+  .sidebar.collapsed { width: 0; border-right: none; }
+  .sidebar-header {
+    padding: 10px 14px; font-size: 11px; font-weight: 700;
+    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;
+  }
+  .pair-list { flex: 1; overflow-y: auto; padding: 6px; }
+  .pair-item {
+    padding: 10px 12px; border-radius: 8px; cursor: pointer;
+    margin-bottom: 3px; transition: all 0.15s; border: 1px solid transparent;
+  }
+  .pair-item:hover { background: var(--bg-elevated); }
+  .pair-item.active { background: var(--bg-elevated); border-color: var(--accent-blue); }
+  .pair-item .pair-name {
+    font-size: 13px; font-weight: 600; color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pair-item .pair-meta {
+    font-size: 11px; color: var(--text-muted); margin-top: 2px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .badge {
+    display: inline-flex; padding: 2px 7px; border-radius: 4px;
+    font-size: 10px; font-weight: 700;
+  }
+  .badge-verified { background: rgba(52,211,153,0.15); color: var(--accent-green); }
+  .badge-pending { background: rgba(136,136,168,0.12); color: var(--text-muted); }
+
+  /* ---- Workspace ---- */
+  .workspace { flex: 1; display: flex; overflow: hidden; }
+  .workspace.empty { align-items: center; justify-content: center; }
+
+  .pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .pane + .pane { border-left: 1px solid var(--border); }
+
+  .pane-header {
+    padding: 8px 14px; background: var(--bg-elevated);
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .pane-header .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ---- Preview pane ---- */
+  .preview-frame { flex: 1; border: none; background: #1e1e2e; }
+  .preview-text {
+    flex: 1; overflow: auto; padding: 20px;
+    font: 14px/1.7 'JetBrains Mono', monospace;
+    color: var(--text-primary); white-space: pre-wrap; word-break: break-word;
+    background: var(--bg-input);
+  }
+
+  /* ---- Editor pane ---- */
+  .editor-tabs { display: flex; gap: 0; flex-shrink: 0; background: var(--bg-card); }
+  .editor-tab {
+    padding: 9px 18px; border: none; background: transparent;
+    color: var(--text-muted); cursor: pointer;
+    font: 600 12px 'Space Grotesk', sans-serif;
+    border-bottom: 2px solid transparent; transition: all 0.15s;
+  }
+  .editor-tab:hover { color: var(--text-secondary); }
+  .editor-tab.active { color: var(--accent-cyan); border-bottom-color: var(--accent-cyan); }
+
+  .editor-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .form-scroll { flex: 1; overflow-y: auto; padding: 20px; }
+
+  .field-group { margin-bottom: 14px; }
+  .field-label {
+    font-size: 11px; font-weight: 700; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;
+  }
+  .field-input {
+    width: 100%; padding: 9px 12px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg-input);
+    color: var(--text-primary); font: 14px 'JetBrains Mono', monospace;
+    transition: border-color 0.2s;
+  }
+  .field-input:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--glow-blue); }
+  .field-input::placeholder { color: var(--text-muted); }
+  .field-input.null-val { color: var(--text-muted); font-style: italic; }
+  textarea.field-input { resize: vertical; min-height: 56px; }
+
+  .container-section {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px; margin-bottom: 12px;
+  }
+  .container-header {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  }
+  .container-header span { font-size: 12px; font-weight: 700; color: var(--text-secondary); }
+  .container-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .container-fields .full { grid-column: 1 / -1; }
+
+  .add-container-btn {
+    width: 100%; padding: 10px; border-radius: 8px;
+    border: 1px dashed var(--border-bright); background: transparent;
+    color: var(--text-secondary); cursor: pointer;
+    font: 500 13px 'Space Grotesk', sans-serif; transition: all 0.2s;
+  }
+  .add-container-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); background: var(--glow-blue); }
+
+  .json-raw {
+    width: 100%; flex: 1; padding: 16px;
+    background: var(--bg-input); color: var(--accent-cyan);
+    font: 13px/1.6 'JetBrains Mono', monospace;
+    border: none; resize: none; outline: none;
+  }
+
+  .empty-state { text-align: center; color: var(--text-muted); padding: 40px; }
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
+
+  /* ---- Toast ---- */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    padding: 12px 20px; border-radius: 8px;
+    background: var(--accent-green); color: #0a0a0f;
+    font-weight: 600; font-size: 14px;
+    transform: translateY(80px); opacity: 0;
+    transition: all 0.3s; z-index: 100;
+  }
+  .toast.error { background: var(--accent-red); color: white; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ---- Modal ---- */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center; z-index: 50;
+  }
+  .modal {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 16px; padding: 28px; width: 540px; max-width: 92vw;
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal h2 { font-size: 18px; margin-bottom: 6px; color: var(--text-primary); }
+  .modal .subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+
+  .upload-zone {
+    border: 2px dashed var(--border-bright); border-radius: 12px;
+    padding: 20px; text-align: center; cursor: pointer;
+    transition: all 0.2s; margin-bottom: 14px;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--accent-blue); background: var(--glow-blue);
+  }
+  .upload-zone .label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+  .upload-zone .filename { font-size: 12px; color: var(--accent-green); margin-top: 6px; font-weight: 600; }
+  .upload-zone input { display: none; }
+
+  .match-preview { margin-top: 10px; }
+  .match-preview table {
+    width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px;
+  }
+  .match-preview th { text-align: left; color: var(--text-muted); padding: 6px 8px; font-size: 11px; text-transform: uppercase; }
+  .match-preview td { padding: 5px 8px; border-top: 1px solid var(--border); color: var(--text-secondary); }
+  .match-preview .matched { color: var(--accent-green); }
+  .match-preview .unmatched { color: var(--accent-red); font-style: italic; }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+  /* ---- Resize handle ---- */
+  .resize-handle {
+    width: 5px; cursor: col-resize; background: transparent;
+    transition: background 0.15s; flex-shrink: 0;
+  }
+  .resize-handle:hover, .resize-handle.active { background: var(--accent-blue); }
+
+  /* ---- Scrollbars ---- */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+</style>
+</head>
+<body>
+
+<div class="layout" id="app"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ============ State ============
+let pairs = [];
+let activePairId = null;
+let jsonData = null;
+let modified = false;
+let editorTab = 'form';
+let showModal = false;
+let sidebarCollapsed = false;
+let uploading = false;
+let previewType = null;
+
+// Batch upload state
+let uploadDocs = [];   // File[]
+let uploadJsons = [];  // File[]
+
+// ============ API ============
+const api = {
+  async list() {
+    const r = await fetch('/api/pairs');
+    if (!r.ok) throw new Error('Failed to list');
+    return r.json();
+  },
+  async getJson(id) {
+    const r = await fetch(`/api/pairs/${id}/json`);
+    if (!r.ok) throw new Error('Failed to load JSON');
+    return r.json();
+  },
+  async saveJson(id, data) {
+    const r = await fetch(`/api/pairs/${id}/json`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(data),
+    });
+    if (!r.ok) throw new Error('Failed to save');
+    return r.json();
+  },
+  async batchUpload(files) {
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    const r = await fetch('/api/pairs/batch', { method: 'POST', body: fd });
+    if (!r.ok) {
+      const e = await r.json().catch(() => ({}));
+      throw new Error(e.detail || 'Upload failed');
+    }
+    return r.json();
+  },
+  async verify(id) {
+    const r = await fetch(`/api/pairs/${id}/verify`, { method: 'PATCH' });
+    if (!r.ok) throw new Error('Failed');
+    return r.json();
+  },
+  async deletePair(id) {
+    const r = await fetch(`/api/pairs/${id}`, { method: 'DELETE' });
+    if (!r.ok) throw new Error('Failed');
+  },
+  async deleteAll() {
+    const r = await fetch('/api/pairs', { method: 'DELETE' });
+    if (!r.ok) throw new Error('Failed');
+    return r.json();
+  },
+  docUrl(id) { return `/api/pairs/${id}/document`; },
+};
+
+// ============ Helpers ============
+function showToast(msg, error = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (error ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function val(v) { return v == null ? '' : String(v); }
+function parseVal(v, type) {
+  const s = v.trim();
+  if (s === '' || s === 'null') return null;
+  if (type === 'number') { const n = parseFloat(s); return isNaN(n) ? null : n; }
+  return s;
+}
+function stem(filename) { return filename.replace(/\.[^.]+$/, ''); }
+
+const DOC_EXT = new Set(['.pdf', '.doc', '.docx', '.txt']);
+function isDoc(name) { const e = name.match(/\.[^.]+$/); return e && DOC_EXT.has(e[0].toLowerCase()); }
+function isJson(name) { return name.toLowerCase().endsWith('.json'); }
+
+// ============ Actions ============
+async function loadPairs() {
+  try {
+    pairs = await api.list();
+    render();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function selectPair(id) {
+  if (modified && !confirm('Есть несохранённые изменения. Переключить?')) return;
+  activePairId = id;
+  modified = false;
+  editorTab = 'form';
+  const pair = pairs.find(p => p.id === id);
+  previewType = pair ? (pair.document_ext === '.txt' ? 'txt' : (pair.document_ext === '.doc' || pair.document_ext === '.docx' ? 'html' : 'pdf')) : null;
+  try {
+    jsonData = await api.getJson(id);
+    render();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function saveCurrentJson() {
+  if (!activePairId || !jsonData) return;
+  try {
+    await api.saveJson(activePairId, jsonData);
+    modified = false;
+    showToast('Сохранено ✓');
+    renderModDot();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function toggleVerify() {
+  if (!activePairId) return;
+  try {
+    const res = await api.verify(activePairId);
+    const idx = pairs.findIndex(p => p.id === activePairId);
+    if (idx >= 0) pairs[idx].verified = res.verified;
+    render();
+    showToast(res.verified ? 'Verified ✓' : 'Unverified');
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function deletePair(id) {
+  if (!confirm('Удалить эту пару?')) return;
+  try {
+    await api.deletePair(id);
+    if (activePairId === id) { activePairId = null; jsonData = null; modified = false; }
+    await loadPairs();
+    showToast('Удалено');
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function deleteAllPairs() {
+  if (!confirm(`Удалить ВСЕ ${pairs.length} пар? Это необратимо.`)) return;
+  try {
+    const res = await api.deleteAll();
+    activePairId = null; jsonData = null; modified = false;
+    await loadPairs();
+    showToast(`Удалено ${res.count} пар`);
+  } catch (e) { showToast(e.message, true); }
+}
+
+// ---- Batch matching ----
+function getMatches() {
+  const docMap = {};
+  const jsonMap = {};
+  uploadDocs.forEach(f => { docMap[stem(f.name)] = f.name; });
+  uploadJsons.forEach(f => { jsonMap[stem(f.name)] = f.name; });
+  const allStems = new Set([...Object.keys(docMap), ...Object.keys(jsonMap)]);
+  const rows = [];
+  for (const s of [...allStems].sort()) {
+    rows.push({ stem: s, doc: docMap[s] || null, json: jsonMap[s] || null, matched: !!(docMap[s] && jsonMap[s]) });
+  }
+  return rows;
+}
+
+async function doBatchUpload() {
+  const allFiles = [...uploadDocs, ...uploadJsons];
+  if (allFiles.length === 0) return;
+  uploading = true;
+  render();
+  try {
+    const res = await api.batchUpload(allFiles);
+    showModal = false;
+    uploadDocs = [];
+    uploadJsons = [];
+    uploading = false;
+    await loadPairs();
+    const ct = res.created.length;
+    const unDoc = res.unmatched_documents?.length || 0;
+    const unJson = res.unmatched_jsons?.length || 0;
+    let msg = `Создано ${ct} пар`;
+    if (unDoc || unJson) msg += ` | Без пары: ${unDoc} док, ${unJson} json`;
+    showToast(msg, (ct === 0));
+    if (ct > 0) await selectPair(res.created[0].id);
+  } catch (e) {
+    uploading = false;
+    render();
+    showToast(e.message, true);
+  }
+}
+
+// ============ Data mutation ============
+function updateField(key, value) {
+  if (!jsonData) return;
+  jsonData[key] = parseVal(value, 'string');
+  modified = true;
+  syncJsonRaw();
+  renderModDot();
+}
+
+function updateContainerField(idx, key, value) {
+  if (!jsonData?.containers?.[idx]) return;
+  jsonData.containers[idx][key] = parseVal(value, key === 'cargoWeight' ? 'number' : 'string');
+  modified = true;
+  syncJsonRaw();
+  renderModDot();
+}
+
+function addContainer() {
+  if (!jsonData) return;
+  if (!jsonData.containers) jsonData.containers = [];
+  jsonData.containers.push({ containerNumber: null, containerType: null, containerSize: null, status: null, cargoWeight: null });
+  modified = true;
+  renderFormContent();
+  syncJsonRaw();
+}
+
+function removeContainer(idx) {
+  if (!jsonData?.containers) return;
+  jsonData.containers.splice(idx, 1);
+  modified = true;
+  renderFormContent();
+  syncJsonRaw();
+}
+
+function onRawJsonInput(text) {
+  try {
+    jsonData = JSON.parse(text);
+    modified = true;
+    renderModDot();
+  } catch {}
+}
+
+function syncJsonRaw() {
+  const el = document.getElementById('json-raw');
+  if (el) el.value = JSON.stringify(jsonData, null, 2);
+}
+
+function renderModDot() {
+  const dot = document.getElementById('mod-dot');
+  if (dot) dot.style.display = modified ? 'inline-block' : 'none';
+}
+
+function switchTab(tab) {
+  editorTab = tab;
+  // Update tab highlight
+  document.querySelectorAll('.editor-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.tab === tab);
+  });
+  // Render editor body content
+  renderEditorBody();
+}
+
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  const sb = document.getElementById('sidebar');
+  if (sb) sb.classList.toggle('collapsed', sidebarCollapsed);
+}
+
+// ============ Rendering ============
+const FIELDS = [
+  {key:'fromAddress', label:'Адрес погрузки', multi:true},
+  {key:'pickupDate', label:'Дата подачи', ph:'YYYY-MM-DD'},
+  {key:'pickupTime', label:'Время подачи', ph:'HH:MM'},
+  {key:'toAddress', label:'Адрес доставки', multi:true},
+  {key:'deliveryDate', label:'Дата доставки', ph:'YYYY-MM-DD'},
+  {key:'deliveryTime', label:'Время доставки', ph:'HH:MM'},
+  {key:'contacts', label:'Контакты', multi:true},
+  {key:'comments', label:'Комментарии', multi:true},
+];
+const CFIELDS = [
+  {key:'containerNumber', label:'Номер', ph:'MSCU 1234567'},
+  {key:'containerType', label:'Тип', ph:'HC/DC/RF/OT/FR'},
+  {key:'containerSize', label:'Размер', ph:"40'HC"},
+  {key:'status', label:'Статус', ph:'loaded/empty'},
+  {key:'cargoWeight', label:'Вес (кг)', ph:'25000', full:true},
+];
+
+function buildFormHTML(data) {
+  if (!data) return '';
+  let h = '';
+  FIELDS.forEach(f => {
+    const v = val(data[f.key]);
+    const isNull = data[f.key] == null;
+    if (f.multi) {
+      h += `<div class="field-group"><div class="field-label">${f.label}</div>
+        <textarea class="field-input ${isNull?'null-val':''}" placeholder="${f.ph||f.label}"
+          oninput="updateField('${f.key}',this.value);this.classList.remove('null-val')">${isNull?'':esc(v)}</textarea></div>`;
+    } else {
+      h += `<div class="field-group"><div class="field-label">${f.label}</div>
+        <input class="field-input ${isNull?'null-val':''}" type="text" value="${esc(isNull?'':v)}"
+          placeholder="${f.ph||f.label}" oninput="updateField('${f.key}',this.value);this.classList.remove('null-val')"></div>`;
+    }
+  });
+  (data.containers||[]).forEach((c,i) => {
+    h += `<div class="container-section"><div class="container-header">
+      <span>Контейнер #${i+1}</span>
+      <button class="btn danger sm" onclick="removeContainer(${i})">Удалить</button></div>
+      <div class="container-fields">`;
+    CFIELDS.forEach(f => {
+      const cv = val(c[f.key]); const isNull = c[f.key]==null;
+      h += `<div class="field-group ${f.full?'full':''}"><div class="field-label">${f.label}</div>
+        <input class="field-input ${isNull?'null-val':''}" type="text" value="${esc(isNull?'':cv)}"
+          placeholder="${f.ph||''}" oninput="updateContainerField(${i},'${f.key}',this.value);this.classList.remove('null-val')"></div>`;
+    });
+    h += '</div></div>';
+  });
+  h += '<button class="add-container-btn" onclick="addContainer()">+ Добавить контейнер</button>';
+  return h;
+}
+
+function renderFormContent() {
+  const el = document.getElementById('form-scroll');
+  if (el && jsonData) el.innerHTML = buildFormHTML(jsonData);
+}
+
+function renderEditorBody() {
+  const body = document.getElementById('editor-body');
+  if (!body || !jsonData) return;
+  if (editorTab === 'form') {
+    body.innerHTML = `<div class="form-scroll" id="form-scroll">${buildFormHTML(jsonData)}</div>`;
+  } else {
+    body.innerHTML = `<textarea class="json-raw" id="json-raw" oninput="onRawJsonInput(this.value)">${esc(JSON.stringify(jsonData,null,2))}</textarea>`;
+  }
+}
+
+function render() {
+  const pair = pairs.find(p => p.id === activePairId);
+  let h = '';
+
+  // ---- Top Bar ----
+  h += `<div class="top-bar">
+    <button class="btn icon-btn" onclick="toggleSidebar()" title="Панель документов">☰</button>
+    <h1>JSON Truth Editor</h1>
+    <span class="spacer"></span>
+    <span style="color:var(--text-muted);font-size:12px">${pairs.length} пар</span>
+    ${pairs.length ? '<button class="btn danger" onclick="deleteAllPairs()">🗑 Удалить все</button>' : ''}
+    <button class="btn primary" onclick="showModal=true;render()">⬆ Загрузить</button>
+  </div>`;
+
+  h += '<div class="main-area">';
+
+  // ---- Sidebar ----
+  h += `<div class="sidebar ${sidebarCollapsed?'collapsed':''}" id="sidebar">
+    <div class="sidebar-header"><span>Документы</span></div>
+    <div class="pair-list">`;
+  if (!pairs.length) {
+    h += '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">Нет пар</div>';
+  }
+  pairs.forEach(p => {
+    h += `<div class="pair-item ${p.id===activePairId?'active':''}" onclick="selectPair('${p.id}')">
+      <div class="pair-name">${esc(p.document_name)}</div>
+      <div class="pair-meta">
+        <span>${esc(p.json_name)}</span>
+        ${p.verified ? '<span class="badge badge-verified">✓</span>' : '<span class="badge badge-pending">…</span>'}
+      </div>
+    </div>`;
+  });
+  h += '</div></div>';
+
+  // ---- Workspace ----
+  if (!activePairId || !jsonData) {
+    h += `<div class="workspace empty"><div class="empty-state">
+      <div class="icon">📋</div>
+      <p style="font-size:16px;margin-bottom:8px">Выберите пару или загрузите новые</p>
+      <p style="font-size:13px">Документы + JSON с одинаковыми именами</p>
+    </div></div>`;
+  } else {
+    h += '<div class="workspace">';
+
+    // Left: Preview
+    h += '<div class="pane" id="preview-pane">';
+    h += `<div class="pane-header">
+      <span class="dot" style="background:var(--accent-purple)"></span>
+      ${esc(pair ? pair.document_name : '')}
+      <span class="spacer"></span>
+      <a class="btn sm" href="/api/pairs/${activePairId}/original" download title="Скачать оригинал">⬇</a>
+    </div>`;
+    if (previewType === 'txt') {
+      h += '<div class="preview-text" id="preview-text">Загрузка…</div>';
+    } else {
+      // pdf and html both render in iframe
+      h += `<iframe class="preview-frame" id="preview-frame" src="${api.docUrl(activePairId)}"></iframe>`;
+    }
+    h += '</div>';
+
+    // Resize handle
+    h += '<div class="resize-handle" id="resize-handle"></div>';
+
+    // Right: Editor
+    h += '<div class="pane" id="editor-pane">';
+    h += `<div class="pane-header">
+      <span class="dot" style="background:var(--accent-cyan)"></span> Редактор
+      <span id="mod-dot" style="width:7px;height:7px;border-radius:50%;background:var(--accent-yellow);display:${modified?'inline-block':'none'}"></span>
+      <span class="spacer"></span>
+      <button class="btn sm save" onclick="saveCurrentJson()">💾 Сохранить</button>
+      <button class="btn sm" style="border-color:var(--accent-green);color:var(--accent-green)" onclick="toggleVerify()">
+        ${pair?.verified ? '✓ Verified' : 'Verify'}
+      </button>
+      <button class="btn sm danger" onclick="deletePair('${activePairId}')">🗑</button>
+    </div>`;
+
+    // Editor tabs — data-tab attribute for switchTab
+    h += `<div class="editor-tabs">
+      <button class="editor-tab ${editorTab==='form'?'active':''}" data-tab="form" onclick="switchTab('form')">Form Editor</button>
+      <button class="editor-tab ${editorTab==='json'?'active':''}" data-tab="json" onclick="switchTab('json')">JSON Raw</button>
+    </div>`;
+
+    h += '<div class="editor-body" id="editor-body"></div>';
+    h += '</div>'; // editor-pane
+    h += '</div>'; // workspace
+  }
+  h += '</div>'; // main-area
+
+  // ---- Upload Modal ----
+  if (showModal) {
+    const matches = getMatches();
+    const matchedCount = matches.filter(m => m.matched).length;
+
+    h += `<div class="modal-overlay" onclick="if(event.target===this){showModal=false;render()}">
+      <div class="modal">
+        <h2>Загрузить файлы</h2>
+        <p class="subtitle">Загрузите документы и JSON файлы. Пары создаются по совпадению имён (например order_1.pdf + order_1.json)</p>
+
+        <div class="upload-zone" onclick="document.getElementById('input-docs').click()"
+             ondragover="event.preventDefault();this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="event.preventDefault();this.classList.remove('dragover');handleDropDocs(event)">
+          <div style="font-size:24px">📄</div>
+          <div class="label">Документы (PDF, DOC, DOCX, TXT) — можно несколько</div>
+          ${uploadDocs.length ? `<div class="filename">${uploadDocs.length} файл(ов): ${uploadDocs.map(f=>f.name).join(', ')}</div>` : ''}
+          <input type="file" id="input-docs" multiple accept=".pdf,.doc,.docx,.txt"
+            onchange="uploadDocs=Array.from(this.files);render()">
+        </div>
+
+        <div class="upload-zone" onclick="document.getElementById('input-jsons').click()"
+             ondragover="event.preventDefault();this.classList.add('dragover')"
+             ondragleave="this.classList.remove('dragover')"
+             ondrop="event.preventDefault();this.classList.remove('dragover');handleDropJsons(event)">
+          <div style="font-size:24px">{ }</div>
+          <div class="label">JSON файлы — можно несколько</div>
+          ${uploadJsons.length ? `<div class="filename">${uploadJsons.length} файл(ов): ${uploadJsons.map(f=>f.name).join(', ')}</div>` : ''}
+          <input type="file" id="input-jsons" multiple accept=".json"
+            onchange="uploadJsons=Array.from(this.files);render()">
+        </div>`;
+
+    // Match preview table
+    if (matches.length) {
+      h += `<div class="match-preview">
+        <div style="font-size:12px;color:var(--text-secondary)">
+          Сопоставление: <strong style="color:var(--accent-green)">${matchedCount} пар</strong>
+          ${matches.length - matchedCount ? ` / <span style="color:var(--accent-red)">${matches.length - matchedCount} без пары</span>` : ''}
+        </div>
+        <table><tr><th>Имя</th><th>Документ</th><th>JSON</th></tr>`;
+      matches.forEach(m => {
+        h += `<tr>
+          <td>${esc(m.stem)}</td>
+          <td class="${m.doc?'matched':'unmatched'}">${m.doc ? esc(m.doc) : '—'}</td>
+          <td class="${m.json?'matched':'unmatched'}">${m.json ? esc(m.json) : '—'}</td>
+        </tr>`;
+      });
+      h += '</table></div>';
+    }
+
+    h += `<div class="modal-actions">
+        <button class="btn" onclick="showModal=false;uploadDocs=[];uploadJsons=[];render()">Отмена</button>
+        <button class="btn primary" onclick="doBatchUpload()" ${(!matchedCount||uploading)?'disabled':''}>
+          ${uploading ? 'Загрузка…' : `Загрузить ${matchedCount} пар`}
+        </button>
+      </div></div></div>`;
+  }
+
+  document.getElementById('app').innerHTML = h;
+
+  // Post-render
+  if (activePairId && jsonData) {
+    renderEditorBody();
+    if (previewType === 'txt') loadTextPreview();
+    setupResize();
+  }
+}
+
+// ---- Drag-drop helpers ----
+function handleDropDocs(e) {
+  const files = Array.from(e.dataTransfer.files).filter(f => isDoc(f.name));
+  if (files.length) { uploadDocs = [...uploadDocs, ...files]; render(); }
+}
+function handleDropJsons(e) {
+  const files = Array.from(e.dataTransfer.files).filter(f => isJson(f.name));
+  if (files.length) { uploadJsons = [...uploadJsons, ...files]; render(); }
+}
+
+// ---- Text preview ----
+async function loadTextPreview() {
+  if (!activePairId) return;
+  try {
+    const r = await fetch(api.docUrl(activePairId));
+    const text = await r.text();
+    const el = document.getElementById('preview-text');
+    if (el) el.textContent = text;
+  } catch {}
+}
+
+// ---- Resize handle ----
+function setupResize() {
+  const handle = document.getElementById('resize-handle');
+  const preview = document.getElementById('preview-pane');
+  if (!handle || !preview) return;
+  let startX, startW;
+  handle.onmousedown = (e) => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = preview.getBoundingClientRect().width;
+    handle.classList.add('active');
+    const onMove = (ev) => {
+      const w = Math.max(200, Math.min(startW + ev.clientX - startX, window.innerWidth - 380));
+      preview.style.flex = 'none';
+      preview.style.width = w + 'px';
+    };
+    const onUp = () => {
+      handle.classList.remove('active');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+}
+
+// ---- Keyboard ----
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey||e.metaKey) && e.key === 's') { e.preventDefault(); saveCurrentJson(); }
+});
+
+// ---- Init ----
+loadPairs();
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+version: "3.8"
+
+services:
+  editor:
+    build: .
+    container_name: json-truth-editor
+    ports:
+      - "8000:8000"
+    volumes:
+      - editor-data:/app/data
+    environment:
+      - MAX_UPLOAD_MB=50
+      - WORKERS=2
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    read_only: false
+    tmpfs:
+      - /tmp:size=512M
+
+volumes:
+  editor-data:
