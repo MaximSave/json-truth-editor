@@ -162,6 +162,13 @@
   .field-input::placeholder { color: var(--text-muted); }
   .field-input.null-val { color: var(--text-muted); font-style: italic; }
   textarea.field-input { resize: vertical; min-height: 56px; }
+  select.field-input {
+    appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888a8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    padding-right: 28px;
+  }
+  select.field-input option { background: var(--bg-card); color: var(--text-primary); }
 
   .container-section {
     background: var(--bg-elevated); border: 1px solid var(--border);
@@ -446,35 +453,111 @@ async function doBatchUpload() {
   }
 }
 
+// ============ Data accessors (handle wrapper structure) ============
+// JSON has: { source_file, mode, model, extraction_result: {...}, meta: {...} }
+// Form edits extraction_result; JSON Raw shows the full file
+function getER() {
+  if (!jsonData) return null;
+  // Support both wrapped and flat formats
+  return jsonData.extraction_result || jsonData;
+}
+
 // ============ Data mutation ============
 function updateField(key, value) {
-  if (!jsonData) return;
-  jsonData[key] = parseVal(value, 'string');
+  const er = getER();
+  if (!er) return;
+  er[key] = parseVal(value, 'string');
   modified = true;
   syncJsonRaw();
   renderModDot();
 }
 
 function updateContainerField(idx, key, value) {
-  if (!jsonData?.containers?.[idx]) return;
-  jsonData.containers[idx][key] = parseVal(value, key === 'cargoWeight' ? 'number' : 'string');
+  const er = getER();
+  if (!er?.containers?.[idx]) return;
+  const type = (key === 'cargoWeight') ? 'number' : (key === 'isUnnumbered') ? 'bool' : 'string';
+  if (type === 'bool') {
+    const s = value.trim().toLowerCase();
+    er.containers[idx][key] = (s === 'true') ? true : (s === 'false') ? false : null;
+  } else {
+    er.containers[idx][key] = parseVal(value, type);
+  }
   modified = true;
   syncJsonRaw();
   renderModDot();
 }
 
 function addContainer() {
-  if (!jsonData) return;
-  if (!jsonData.containers) jsonData.containers = [];
-  jsonData.containers.push({ containerNumber: null, containerType: null, containerSize: null, status: null, cargoWeight: null });
+  const er = getER();
+  if (!er) return;
+  if (!er.containers) er.containers = [];
+  er.containers.push({
+    containerNumber: null, containerType: null, containerSize: null,
+    status: null, cargoWeight: null, isUnnumbered: null, pinCode: null, comment: null
+  });
   modified = true;
   renderFormContent();
   syncJsonRaw();
 }
 
 function removeContainer(idx) {
-  if (!jsonData?.containers) return;
-  jsonData.containers.splice(idx, 1);
+  const er = getER();
+  if (!er?.containers) return;
+  er.containers.splice(idx, 1);
+  modified = true;
+  renderFormContent();
+  syncJsonRaw();
+}
+
+// ---- RoutePoints ----
+function updateRouteField(idx, key, value) {
+  const er = getER();
+  if (!er?.routePoints?.[idx]) return;
+  if (key === 'order') {
+    er.routePoints[idx][key] = parseInt(value) || null;
+  } else if (key === 'containerRefs') {
+    // Parse comma-separated indices: "0, 1, 2" → [0, 1, 2]
+    const refs = value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    er.routePoints[idx][key] = refs.length ? refs : null;
+  } else {
+    er.routePoints[idx][key] = parseVal(value, 'string');
+  }
+  modified = true;
+  syncJsonRaw();
+  renderModDot();
+}
+
+function addRoutePoint() {
+  const er = getER();
+  if (!er) return;
+  if (!er.routePoints) er.routePoints = [];
+  const nextOrder = er.routePoints.length ? Math.max(...er.routePoints.map(r => r.order || 0)) + 1 : 1;
+  er.routePoints.push({
+    order: nextOrder, type: 'other', rawAddress: '', normalizedAddress: null,
+    plannedDate: null, plannedTime: null, containerRefs: [0], comment: null
+  });
+  modified = true;
+  renderFormContent();
+  syncJsonRaw();
+}
+
+function removeRoutePoint(idx) {
+  const er = getER();
+  if (!er?.routePoints) return;
+  er.routePoints.splice(idx, 1);
+  modified = true;
+  renderFormContent();
+  syncJsonRaw();
+}
+
+function moveRoutePoint(idx, dir) {
+  const er = getER();
+  if (!er?.routePoints) return;
+  const target = idx + dir;
+  if (target < 0 || target >= er.routePoints.length) return;
+  [er.routePoints[idx], er.routePoints[target]] = [er.routePoints[target], er.routePoints[idx]];
+  // Re-number orders
+  er.routePoints.forEach((rp, i) => { rp.order = i + 1; });
   modified = true;
   renderFormContent();
   syncJsonRaw();
@@ -516,29 +599,49 @@ function toggleSidebar() {
 
 // ============ Rendering ============
 const FIELDS = [
-  {key:'fromAddress', label:'Адрес погрузки', multi:true},
+  {key:'fromAddress', label:'Адрес отправления (from)', multi:true},
   {key:'pickupDate', label:'Дата подачи', ph:'YYYY-MM-DD'},
   {key:'pickupTime', label:'Время подачи', ph:'HH:MM'},
-  {key:'toAddress', label:'Адрес доставки', multi:true},
+  {key:'toAddress', label:'Адрес доставки (to)', multi:true},
   {key:'deliveryDate', label:'Дата доставки', ph:'YYYY-MM-DD'},
   {key:'deliveryTime', label:'Время доставки', ph:'HH:MM'},
   {key:'contacts', label:'Контакты', multi:true},
   {key:'comments', label:'Комментарии', multi:true},
 ];
 const CFIELDS = [
-  {key:'containerNumber', label:'Номер', ph:'MSCU 1234567'},
+  {key:'containerNumber', label:'Номер (ISO 6346)', ph:'MSCU1234567'},
   {key:'containerType', label:'Тип', ph:'HC/DC/RF/OT/FR'},
   {key:'containerSize', label:'Размер', ph:"40'HC"},
   {key:'status', label:'Статус', ph:'loaded/empty'},
-  {key:'cargoWeight', label:'Вес (кг)', ph:'25000', full:true},
+  {key:'cargoWeight', label:'Вес (кг)', ph:'25000'},
+  {key:'isUnnumbered', label:'Безномерной', ph:'true/false'},
+  {key:'pinCode', label:'ПИН-код', ph:'0796'},
+  {key:'comment', label:'Комментарий к ктк', ph:'Сухой, целый...', full:true},
 ];
+const RP_TYPES = ['pickup_empty','pickup_loaded','wash','load','dropoff_loaded','return_empty','other'];
 
 function buildFormHTML(data) {
   if (!data) return '';
+  const er = data.extraction_result || data;
   let h = '';
+
+  // ---- Meta info (read-only) ----
+  if (data.extraction_result) {
+    h += `<div class="container-section" style="margin-bottom:16px;border-color:var(--border)">
+      <div style="font-size:11px;color:var(--text-muted);display:flex;gap:16px;flex-wrap:wrap">
+        <span>📄 ${esc(data.source_file || '—')}</span>
+        <span>🤖 ${esc(data.model || '—')}</span>
+        <span>📝 ${esc(data.raw_text_method || '—')}</span>
+        ${data.meta?.ocr_confidence ? `<span>OCR: ${data.meta.ocr_confidence}%</span>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // ---- Main fields ----
+  h += '<div style="font-size:12px;font-weight:700;color:var(--accent-purple);margin-bottom:8px;text-transform:uppercase">Основные поля</div>';
   FIELDS.forEach(f => {
-    const v = val(data[f.key]);
-    const isNull = data[f.key] == null;
+    const v = val(er[f.key]);
+    const isNull = er[f.key] == null;
     if (f.multi) {
       h += `<div class="field-group"><div class="field-label">${f.label}</div>
         <textarea class="field-input ${isNull?'null-val':''}" placeholder="${f.ph||f.label}"
@@ -549,9 +652,12 @@ function buildFormHTML(data) {
           placeholder="${f.ph||f.label}" oninput="updateField('${f.key}',this.value);this.classList.remove('null-val')"></div>`;
     }
   });
-  (data.containers||[]).forEach((c,i) => {
+
+  // ---- Containers ----
+  h += '<div style="font-size:12px;font-weight:700;color:var(--accent-cyan);margin:16px 0 8px;text-transform:uppercase">Контейнеры</div>';
+  (er.containers||[]).forEach((c,i) => {
     h += `<div class="container-section"><div class="container-header">
-      <span>Контейнер #${i+1}</span>
+      <span>Контейнер #${i+1} ${c.containerNumber ? '— '+esc(c.containerNumber) : c.isUnnumbered ? '— безномерной' : ''}</span>
       <button class="btn danger sm" onclick="removeContainer(${i})">Удалить</button></div>
       <div class="container-fields">`;
     CFIELDS.forEach(f => {
@@ -563,6 +669,52 @@ function buildFormHTML(data) {
     h += '</div></div>';
   });
   h += '<button class="add-container-btn" onclick="addContainer()">+ Добавить контейнер</button>';
+
+  // ---- Route Points ----
+  h += '<div style="font-size:12px;font-weight:700;color:var(--accent-yellow);margin:20px 0 8px;text-transform:uppercase">Маршрутные точки (routePoints)</div>';
+  const rps = er.routePoints || [];
+  if (rps.length === 0) {
+    h += '<div style="color:var(--text-muted);font-size:12px;margin-bottom:8px">null — нет маршрутных точек (простой маршрут откуда→куда)</div>';
+  }
+  rps.forEach((rp, i) => {
+    const typeColor = {pickup_empty:'#22d3ee',pickup_loaded:'#34d399',wash:'#a78bfa',load:'#fbbf24',dropoff_loaded:'#f87171',return_empty:'#8888a8',other:'#555570'}[rp.type]||'#555570';
+    h += `<div class="container-section" style="border-left:3px solid ${typeColor}">
+      <div class="container-header">
+        <span style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px;font-weight:700;color:var(--accent-blue)">#${rp.order||i+1}</span>
+          <span style="color:${typeColor};font-weight:600;font-size:12px">${esc(rp.type||'other')}</span>
+        </span>
+        <span style="display:flex;gap:4px">
+          <button class="btn sm" onclick="moveRoutePoint(${i},-1)" ${i===0?'disabled':''}>↑</button>
+          <button class="btn sm" onclick="moveRoutePoint(${i},1)" ${i===rps.length-1?'disabled':''}>↓</button>
+          <button class="btn danger sm" onclick="removeRoutePoint(${i})">✕</button>
+        </span>
+      </div>
+      <div class="container-fields">
+        <div class="field-group"><div class="field-label">Тип</div>
+          <select class="field-input" onchange="updateRouteField(${i},'type',this.value)">
+            ${RP_TYPES.map(t => `<option value="${t}" ${t===rp.type?'selected':''}>${t}</option>`).join('')}
+          </select></div>
+        <div class="field-group"><div class="field-label">Дата</div>
+          <input class="field-input ${rp.plannedDate==null?'null-val':''}" type="text" value="${esc(val(rp.plannedDate))}"
+            placeholder="YYYY-MM-DD" oninput="updateRouteField(${i},'plannedDate',this.value);this.classList.remove('null-val')"></div>
+        <div class="field-group full"><div class="field-label">Адрес (rawAddress)</div>
+          <input class="field-input ${rp.rawAddress==null?'null-val':''}" type="text" value="${esc(val(rp.rawAddress))}"
+            placeholder="Адрес как в документе" oninput="updateRouteField(${i},'rawAddress',this.value);this.classList.remove('null-val')"></div>
+        <div class="field-group"><div class="field-label">Время</div>
+          <input class="field-input ${rp.plannedTime==null?'null-val':''}" type="text" value="${esc(val(rp.plannedTime))}"
+            placeholder="HH:MM" oninput="updateRouteField(${i},'plannedTime',this.value);this.classList.remove('null-val')"></div>
+        <div class="field-group"><div class="field-label">containerRefs</div>
+          <input class="field-input" type="text" value="${(rp.containerRefs||[]).join(', ')}"
+            placeholder="0, 1, 2" oninput="updateRouteField(${i},'containerRefs',this.value)"></div>
+        <div class="field-group full"><div class="field-label">Комментарий</div>
+          <input class="field-input ${rp.comment==null?'null-val':''}" type="text" value="${esc(val(rp.comment))}"
+            placeholder="" oninput="updateRouteField(${i},'comment',this.value);this.classList.remove('null-val')"></div>
+      </div>
+    </div>`;
+  });
+  h += '<button class="add-container-btn" onclick="addRoutePoint()">+ Добавить маршрутную точку</button>';
+
   return h;
 }
 
