@@ -4,945 +4,1644 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JSON Truth Editor</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg-primary: #0a0a0f;
-    --bg-card: #12121a;
-    --bg-elevated: #1a1a28;
-    --bg-hover: #222236;
-    --bg-input: #0e0e18;
-    --border: #2a2a3e;
-    --border-bright: #3a3a5e;
-    --border-focus: #6366f1;
-    --text-primary: #e8e8f0;
-    --text-secondary: #8888a8;
-    --text-muted: #555570;
-    --accent-blue: #6366f1;
-    --accent-cyan: #22d3ee;
-    --accent-green: #34d399;
-    --accent-yellow: #fbbf24;
-    --accent-red: #f87171;
-    --accent-purple: #a78bfa;
-    --glow-blue: rgba(99,102,241,0.15);
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* ─── Style aligned with TMS AI Test Runner (server.py) ─── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; overflow: hidden; }
   body {
-    background: var(--bg-primary); color: var(--text-primary);
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #f5f5f5; color: #333;
   }
-  body::before {
-    content: ''; position: fixed; inset: 0;
-    background: radial-gradient(ellipse at 20% 0%, var(--glow-blue) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 100%, rgba(34,211,238,0.08) 0%, transparent 50%);
-    pointer-events: none; z-index: 0;
-  }
-  .layout { display: flex; flex-direction: column; height: 100vh; position: relative; z-index: 1; }
 
-  /* ---- Top Bar ---- */
-  .top-bar {
-    display: flex; align-items: center; gap: 16px; padding: 10px 20px;
-    border-bottom: 1px solid var(--border); background: var(--bg-card); flex-shrink: 0;
+  /* Header */
+  .header {
+    background: #1a1a2e;
+    color: white; padding: 12px 24px; display: flex; align-items: center; gap: 16px;
+    flex-shrink: 0; border-bottom: 1px solid #16213e;
   }
-  .top-bar h1 {
-    font-size: 20px; font-weight: 700;
-    background: linear-gradient(135deg, #a78bfa, #22d3ee);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    white-space: nowrap;
+  .header h1 { font-size: 18px; font-weight: 600; letter-spacing: .2px; color: #fff; }
+  .header .subtitle { font-size: 12px; opacity: .6; }
+  .header .spacer { flex: 1; }
+  .header .progress-wrap {
+    display: flex; align-items: center; gap: 10px; font-size: 12px; opacity: .85;
   }
-  .spacer { flex: 1; }
+  .header .progress-bar {
+    width: 140px; height: 4px; background: rgba(255,255,255,.15);
+    border-radius: 2px; overflow: hidden;
+  }
+  .header .progress-bar-fill {
+    height: 100%; background: #2e7d32;
+    transition: width .25s ease;
+  }
 
-  /* ---- Buttons ---- */
-  .btn {
-    padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--bg-card); color: var(--text-primary); cursor: pointer;
-    font: 600 12px 'Space Grotesk', sans-serif; transition: all 0.2s;
-    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
-  }
-  .btn:hover { border-color: var(--border-bright); background: var(--bg-elevated); }
-  .btn:disabled { opacity: 0.4; cursor: default; }
-  .btn.primary { border-color: var(--accent-blue); background: rgba(99,102,241,0.15); }
-  .btn.primary:hover { background: rgba(99,102,241,0.25); }
-  .btn.danger { border-color: var(--accent-red); color: var(--accent-red); }
-  .btn.danger:hover { background: rgba(248,113,113,0.1); }
-  .btn.save { border-color: var(--accent-green); color: var(--accent-green); }
-  .btn.save:hover { background: rgba(52,211,153,0.12); }
-  .btn.sm { padding: 4px 10px; font-size: 11px; }
-  .btn.icon-btn { padding: 7px 10px; font-size: 16px; }
+  /* Buttons */
+  button { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer;
+           font-size: 14px; font-weight: 500; transition: all .15s; }
+  .btn-primary { background: #1a73e8; color: white; }
+  .btn-primary:hover { background: #1557b0; }
+  .btn-danger { background: #e53935; color: white; }
+  .btn-danger:hover { background: #c62828; }
+  .btn-secondary { background: #e0e0e0; color: #333; }
+  .btn-secondary:hover { background: #bdbdbd; }
+  .btn-success { background: #2e7d32; color: white; }
+  .btn-success:hover { background: #1b5e20; }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-icon { padding: 6px 8px; font-size: 14px; line-height: 1; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .btn-ghost { background: transparent; color: #555; border: 1px solid #ddd; }
+  .btn-ghost:hover { background: #f0f0f0; }
 
-  /* ---- Main area ---- */
-  .main-area { display: flex; flex: 1; overflow: hidden; }
+  /* Layout: [ sidebar | document | form ]
+     - Sidebar (список) и document — слева;
+     - Форма — справа.
+     - Sidebar можно сворачивать; document и form остаются на своих местах. */
+  .layout { display: flex; flex-direction: column; height: 100vh; }
+  .main-area { flex: 1; display: grid;
+               grid-template-columns: 260px minmax(0, 1fr) minmax(560px, 1fr);
+               gap: 0; overflow: hidden; min-height: 0; }
+  .main-area.collapsed-sidebar {
+    grid-template-columns: 0 minmax(0, 1fr) minmax(560px, 1fr);
+  }
+  .main-area.collapsed-sidebar .sidebar {
+    width: 0; min-width: 0; border-right: none; overflow: hidden; visibility: hidden;
+  }
 
-  /* ---- Sidebar ---- */
-  .sidebar {
-    width: 260px; min-width: 0; border-right: 1px solid var(--border);
-    background: var(--bg-card); display: flex; flex-direction: column;
-    flex-shrink: 0; overflow: hidden; transition: width 0.25s ease;
+  /* Sidebar (pairs list) */
+  .sidebar { background: white; border-right: 1px solid #e0e0e0;
+             display: flex; flex-direction: column; overflow: hidden; }
+  .sidebar-header { padding: 12px 14px; border-bottom: 1px solid #eee;
+                    display: flex; align-items: center; gap: 8px; }
+  .sidebar-header h3 { font-size: 13px; color: #555; text-transform: uppercase;
+                       font-weight: 600; flex: 1; letter-spacing: .3px; }
+  .sidebar-search { padding: 8px 14px; border-bottom: 1px solid #eee; }
+  .sidebar-search input {
+    width: 100%; padding: 6px 10px; border: 1px solid #ddd; border-radius: 6px;
+    font-size: 13px; outline: none;
   }
-  .sidebar.collapsed { width: 0; border-right: none; }
-  .sidebar-header {
-    padding: 10px 14px; font-size: 11px; font-weight: 700;
-    color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
-    border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;
+  .sidebar-search input:focus { border-color: #1a73e8; }
+  .sidebar-filter {
+    display: flex; gap: 4px; padding: 6px 14px 8px; font-size: 11px; color: #888;
   }
-  .pair-list { flex: 1; overflow-y: auto; padding: 6px; }
+  .sidebar-filter button {
+    flex: 1; padding: 4px 6px; font-size: 11px; background: #f5f5f5; color: #555;
+    border-radius: 4px;
+  }
+  .sidebar-filter button.active { background: #1a73e8; color: white; }
+  .pair-list { flex: 1; overflow-y: auto; padding: 6px 8px; }
   .pair-item {
-    padding: 10px 12px; border-radius: 8px; cursor: pointer;
-    margin-bottom: 3px; transition: all 0.15s; border: 1px solid transparent;
+    padding: 9px 10px; margin-bottom: 4px; border-radius: 6px; cursor: pointer;
+    border: 1px solid transparent; font-size: 13px; line-height: 1.35;
+    display: flex; flex-direction: column; gap: 2px;
   }
-  .pair-item:hover { background: var(--bg-elevated); }
-  .pair-item.active { background: var(--bg-elevated); border-color: var(--accent-blue); }
-  .pair-item .pair-name {
-    font-size: 13px; font-weight: 600; color: var(--text-primary);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .pair-item:hover { background: #f0f4ff; }
+  .pair-item.active { background: #e8f0fe; border-color: #1a73e8; }
+  .pair-item.verified { border-left: 3px solid #2e7d32; padding-left: 7px; }
+  .pair-item .pair-name { font-weight: 500; color: #333; word-break: break-all; }
+  .pair-item .pair-meta { font-size: 11px; color: #888; display: flex;
+                          gap: 6px; align-items: center; }
+  .pair-item .ext-badge {
+    display: inline-block; padding: 0 6px; border-radius: 3px;
+    font-size: 10px; font-weight: 600; background: #f0f0f0; color: #555;
+    text-transform: uppercase;
   }
-  .pair-item .pair-meta {
-    font-size: 11px; color: var(--text-muted); margin-top: 2px;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .badge {
-    display: inline-flex; padding: 2px 7px; border-radius: 4px;
-    font-size: 10px; font-weight: 700;
-  }
-  .badge-verified { background: rgba(52,211,153,0.15); color: var(--accent-green); }
-  .badge-pending { background: rgba(136,136,168,0.12); color: var(--text-muted); }
+  .pair-item .verified-badge { color: #2e7d32; font-weight: 600; }
+  .pair-item .pair-name-small { font-size: 11px; color: #999; }
 
-  /* ---- Workspace ---- */
-  .workspace { flex: 1; display: flex; overflow: hidden; }
-  .workspace.empty { align-items: center; justify-content: center; }
+  /* Document panel */
+  .panel { background: white; display: flex; flex-direction: column;
+           overflow: hidden; min-height: 0; }
+  .panel-header {
+    padding: 8px 14px; background: #f9f9f9; border-bottom: 1px solid #e0e0e0;
+    display: flex; align-items: center; gap: 8px; min-height: 40px;
+  }
+  .panel-header h3 { font-size: 12px; color: #555; text-transform: uppercase;
+                     font-weight: 600; letter-spacing: .3px; flex: 1; }
+  .doc-panel { border-right: 1px solid #e0e0e0; }
+  .doc-panel-body { flex: 1; overflow: auto; background: #fafafa; min-height: 0; }
+  .doc-panel-body iframe {
+    width: 100%; height: 100%; border: 0; background: white;
+  }
+  .doc-panel-body pre {
+    margin: 0; padding: 16px; font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px; white-space: pre-wrap; word-break: break-word; color: #333;
+    background: white; min-height: 100%;
+  }
+  .doc-empty { padding: 60px 20px; text-align: center; color: #999;
+               font-size: 14px; }
 
-  .pane { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
-  .pane + .pane { border-left: 1px solid var(--border); }
+  /* JSON editor panel */
+  .json-panel { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+  .json-tabs { display: flex; border-bottom: 1px solid #e0e0e0; background: white; }
+  .json-tab {
+    padding: 8px 14px; cursor: pointer; font-size: 12px; font-weight: 600;
+    border: none; background: white; color: #888; text-transform: uppercase;
+    letter-spacing: .3px; border-bottom: 2px solid transparent;
+  }
+  .json-tab.active { color: #1a73e8; border-bottom-color: #1a73e8;
+                     background: #e8f0fe; }
+  .json-tab:hover:not(.active) { color: #555; background: #f5f5f5; }
+  .json-toolbar {
+    display: flex; gap: 6px; padding: 6px 12px; background: #f9f9f9;
+    border-bottom: 1px solid #e0e0e0; flex-wrap: wrap; align-items: center;
+  }
+  .json-toolbar .tool-group {
+    display: flex; gap: 4px; padding-right: 8px; border-right: 1px solid #ddd;
+  }
+  .json-toolbar .tool-group:last-child { border-right: none; }
+  .json-status {
+    margin-left: auto; font-size: 11px; padding: 3px 8px; border-radius: 4px;
+    font-weight: 600; opacity: 0; transition: opacity .25s ease;
+    pointer-events: none;
+  }
+  .json-status.visible { opacity: 1; }
+  .json-status.dirty { background: #fff3e0; color: #e65100; }
+  .json-status.clean { background: #e8f5e9; color: #2e7d32; }
+  .json-status.invalid { background: #ffebee; color: #c62828; }
+  .json-body { flex: 1; overflow: auto; min-height: 0; background: white; }
+  .json-body textarea {
+    width: 100%; height: 100%; min-height: 100%; border: 0; outline: 0;
+    padding: 14px; font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 13px; line-height: 1.55; resize: none; color: #333;
+    background: white; tab-size: 2;
+  }
+  .json-error-bar {
+    padding: 8px 14px; background: #ffebee; color: #c62828;
+    border-top: 1px solid #f8b8b8; font-size: 12px; font-family: monospace;
+    display: none;
+  }
+  .json-error-bar.visible { display: block; }
 
-  .pane-header {
-    padding: 8px 14px; background: var(--bg-elevated);
-    font-size: 11px; font-weight: 700; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 0.08em;
+  /* ─── Form Editor (Stage 2 — стилистика как у request-form-v2) ─── */
+  .form-body { padding: 16px; overflow-y: auto; flex: 1; min-height: 0; background: #f5f5f5; }
+  .form-section {
+    background: white; border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
+  }
+  .form-section h4 {
+    font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: .3px;
+    margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #eee;
     display: flex; align-items: center; gap: 8px;
-    border-bottom: 1px solid var(--border); flex-shrink: 0;
   }
-  .pane-header .dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-
-  /* ---- Preview pane ---- */
-  .preview-frame { flex: 1; border: none; background: #1e1e2e; }
-  .preview-text {
-    flex: 1; overflow: auto; padding: 20px;
-    font: 14px/1.7 'JetBrains Mono', monospace;
-    color: var(--text-primary); white-space: pre-wrap; word-break: break-word;
-    background: var(--bg-input);
+  .form-section h4 .count {
+    background: #e0e0e0; color: #555; padding: 2px 8px; border-radius: 10px;
+    font-size: 10px; font-weight: 600;
+  }
+  .form-section .section-explainer {
+    font-size: 11px; color: #888; margin-bottom: 10px; line-height: 1.5;
   }
 
-  /* ---- Editor pane ---- */
-  .editor-tabs { display: flex; gap: 0; flex-shrink: 0; background: var(--bg-card); }
-  .editor-tab {
-    padding: 9px 18px; border: none; background: transparent;
-    color: var(--text-muted); cursor: pointer;
-    font: 600 12px 'Space Grotesk', sans-serif;
-    border-bottom: 2px solid transparent; transition: all 0.15s;
+  /* Compact two-column field layout */
+  .form-row { display: grid; grid-template-columns: 130px 1fr; gap: 8px;
+              margin-bottom: 6px; align-items: start; }
+  .form-row.full { grid-template-columns: 1fr; }
+  .form-row label { font-size: 12px; color: #555; padding-top: 6px;
+                    font-weight: 500; }
+  .form-row .label-with-req::after {
+    content: ' *'; color: #c62828; font-weight: 700;
   }
-  .editor-tab:hover { color: var(--text-secondary); }
-  .editor-tab.active { color: var(--accent-cyan); border-bottom-color: var(--accent-cyan); }
+  .form-row input, .form-row textarea, .form-row select {
+    width: 100%; padding: 6px 9px; border: 1px solid #ddd; border-radius: 4px;
+    font: 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: white; color: #333; outline: none;
+  }
+  .form-row input:focus, .form-row textarea:focus, .form-row select:focus {
+    border-color: #1a73e8;
+  }
+  .form-row textarea { resize: vertical; min-height: 34px; }
+  .form-row .input-null { background: #fafafa; color: #999; font-style: italic; }
 
-  .editor-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-  .form-scroll { flex: 1; overflow-y: auto; padding: 20px; }
+  /* Inline two-field row inside one form-row (date + time) */
+  .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
-  .field-group { margin-bottom: 14px; }
-  .field-label {
-    font-size: 11px; font-weight: 700; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;
+  /* Toggle row (Switch-style) — like the Сложный маршрут toggle in v2 */
+  .toggle-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; background: white; border: 1px solid #e0e0e0;
+    border-radius: 8px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.04);
   }
-  .field-input {
-    width: 100%; padding: 9px 12px; border-radius: 6px;
-    border: 1px solid var(--border); background: var(--bg-input);
-    color: var(--text-primary); font: 14px 'JetBrains Mono', monospace;
-    transition: border-color 0.2s;
+  .toggle-row .toggle-text { flex: 1; }
+  .toggle-row .toggle-text .title { font-weight: 600; font-size: 14px; color: #333; }
+  .toggle-row .toggle-text .hint { font-size: 11px; color: #888; margin-top: 2px; line-height: 1.4; }
+  .switch {
+    position: relative; width: 40px; height: 22px; border-radius: 11px;
+    background: #ccc; cursor: pointer; transition: background .2s; flex-shrink: 0;
   }
-  .field-input:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--glow-blue); }
-  .field-input::placeholder { color: var(--text-muted); }
-  .field-input.null-val { color: var(--text-muted); font-style: italic; }
-  textarea.field-input { resize: vertical; min-height: 56px; }
-  select.field-input {
-    appearance: none; cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238888a8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 10px center;
-    padding-right: 28px;
+  .switch.on { background: #1a73e8; }
+  .switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 18px; height: 18px; border-radius: 50%; background: white;
+    transition: transform .2s; box-shadow: 0 1px 2px rgba(0,0,0,.2);
   }
-  select.field-input option { background: var(--bg-card); color: var(--text-primary); }
+  .switch.on::after { transform: translateX(18px); }
 
-  .container-section {
-    background: var(--bg-elevated); border: 1px solid var(--border);
-    border-radius: 8px; padding: 14px; margin-bottom: 12px;
+  /* Footer: summary + actions */
+  .form-footer {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 0; border-top: 1px solid #e0e0e0; margin-top: 8px;
   }
-  .container-header {
-    display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+  .form-footer .summary {
+    font-size: 13px; color: #555;
   }
-  .container-header span { font-size: 12px; font-weight: 700; color: var(--text-secondary); }
-  .container-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .container-fields .full { grid-column: 1 / -1; }
-
-  .add-container-btn {
-    width: 100%; padding: 10px; border-radius: 8px;
-    border: 1px dashed var(--border-bright); background: transparent;
-    color: var(--text-secondary); cursor: pointer;
-    font: 500 13px 'Space Grotesk', sans-serif; transition: all 0.2s;
+  .form-footer .summary strong { color: #333; }
+  /* Point card — стиль request-form-v2: бейдж + заголовок + поля */
+  .point-card {
+    background: white; border: 1px solid #d0d0d0; border-radius: 8px;
+    padding: 14px; margin-bottom: 12px; position: relative;
   }
-  .add-container-btn:hover { border-color: var(--accent-blue); color: var(--accent-blue); background: var(--glow-blue); }
-
-  .json-raw {
-    width: 100%; flex: 1; padding: 16px;
-    background: var(--bg-input); color: var(--accent-cyan);
-    font: 13px/1.6 'JetBrains Mono', monospace;
-    border: none; resize: none; outline: none;
+  .point-card.endpoint { border-color: #1a1a2e; border-left-width: 3px; }
+  .point-card-header {
+    display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px;
+  }
+  .point-label-badge {
+    min-width: 36px; height: 36px; padding: 0 10px; border-radius: 50%;
+    background: #e0e0e0; color: #333; display: inline-flex;
+    align-items: center; justify-content: center;
+    font-weight: 700; font-size: 14px; font-family: monospace;
+    flex-shrink: 0;
+  }
+  .point-label-badge.start { background: #c62828; color: white; }
+  .point-label-badge.end   { background: #1a1a2e; color: white; }
+  .point-label-badge.mid   { background: #e0e0e0; color: #333; }
+  .point-title-block { flex: 1; min-width: 0; }
+  .point-card-title { font-weight: 600; color: #333; font-size: 14px; margin-bottom: 4px; }
+  .point-card-subtitle {
+    font-size: 11px; color: #888; font-family: monospace;
+  }
+  .point-actions {
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: flex-start;
   }
 
-  .empty-state { text-align: center; color: var(--text-muted); padding: 40px; }
-  .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
-
-  /* ---- Toast ---- */
-  .toast {
-    position: fixed; bottom: 24px; right: 24px;
-    padding: 12px 20px; border-radius: 8px;
-    background: var(--accent-green); color: #0a0a0f;
-    font-weight: 600; font-size: 14px;
-    transform: translateY(80px); opacity: 0;
-    transition: all 0.3s; z-index: 100;
+  /* Container card — стиль карточки контейнера v2 */
+  .container-card {
+    background: #fafafa; border: 1px solid #e0e0e0; border-radius: 6px;
+    padding: 12px; margin: 8px 0;
   }
-  .toast.error { background: var(--accent-red); color: white; }
-  .toast.show { transform: translateY(0); opacity: 1; }
+  .container-card.compact { padding: 10px; }
+  .container-card .form-row { grid-template-columns: 110px 1fr; }
+  .ctr-card-header {
+    display: flex; align-items: flex-start; gap: 8px; margin-bottom: 10px;
+    padding-bottom: 8px; border-bottom: 1px solid #eee;
+  }
+  .ctr-card-title-block { flex: 1; min-width: 0; }
+  .ctr-card-title { font-weight: 600; color: #333; font-size: 13px; }
+  .ctr-card-summary {
+    font-size: 11px; color: #888; font-family: monospace; margin-top: 2px;
+    word-break: break-all;
+  }
 
-  /* ---- Modal ---- */
+  /* Inline containers section header inside a point */
+  .ctr-section {
+    margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ddd;
+  }
+  .ctr-section-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+    font-size: 11px; color: #555; text-transform: uppercase; letter-spacing: .3px;
+    font-weight: 600;
+  }
+  .ctr-section-header .count {
+    background: #e0e0e0; color: #555; padding: 1px 7px; border-radius: 8px;
+    font-size: 10px;
+  }
+
+  /* Add buttons — clean dashed-border style */
+  .add-point-btn {
+    width: 100%; padding: 9px; border: 1px dashed #bbb; color: #555;
+    background: white; border-radius: 6px;
+    margin: 8px 0 4px; font-weight: 500; font-size: 13px;
+  }
+  .add-point-btn:hover { background: #f5f5f5; border-color: #1a73e8; color: #1a73e8; }
+  .add-ctr-btn {
+    padding: 6px 12px; border: 1px dashed #bbb; color: #555;
+    background: white; border-radius: 4px; font-size: 12px;
+  }
+  .add-ctr-btn:hover { background: #f5f5f5; border-color: #1a73e8; color: #1a73e8; }
+
+  /* Empty state */
+  .empty-state { padding: 80px 20px; text-align: center; color: #888; }
+  .empty-state h2 { font-size: 18px; color: #555; margin-bottom: 10px; }
+  .empty-state p { font-size: 13px; margin-bottom: 16px; line-height: 1.6; }
+  .empty-state .upload-hint {
+    background: #e8f0fe; padding: 12px 16px; border-radius: 6px;
+    color: #1a73e8; font-size: 12px; max-width: 460px; margin: 16px auto 0;
+    line-height: 1.5;
+  }
+
+  /* Modal */
   .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
-    display: flex; align-items: center; justify-content: center; z-index: 50;
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 1000; justify-content: center; align-items: flex-start;
+    padding: 60px 20px 20px; overflow-y: auto;
   }
+  .modal-overlay.open { display: flex; }
   .modal {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: 16px; padding: 28px; width: 540px; max-width: 92vw;
-    max-height: 90vh; overflow-y: auto;
+    background: white; border-radius: 8px; width: 100%; max-width: 640px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.25);
+    display: flex; flex-direction: column; overflow: hidden;
+    margin: 0 auto;
   }
-  .modal h2 { font-size: 18px; margin-bottom: 6px; color: var(--text-primary); }
-  .modal .subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+  .modal-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px; border-bottom: 1px solid #e0e0e0; background: #f9f9f9;
+    flex-shrink: 0;
+  }
+  .modal-header h2 { font-size: 16px; color: #333; font-weight: 600; }
+  .modal-close {
+    background: none; border: none; font-size: 22px; cursor: pointer;
+    color: #888; padding: 0 6px; line-height: 1; font-weight: 400;
+  }
+  .modal-close:hover { color: #333; }
+  .modal-body { padding: 18px 20px; overflow-y: auto; }
+  .modal-body > * { width: 100%; max-width: 100%; box-sizing: border-box; }
 
+  /* Upload zone — explicit block-level so children stack correctly */
   .upload-zone {
-    border: 2px dashed var(--border-bright); border-radius: 12px;
-    padding: 20px; text-align: center; cursor: pointer;
-    transition: all 0.2s; margin-bottom: 14px;
+    display: block;
+    width: 100%; box-sizing: border-box;
+    padding: 32px 20px; margin: 8px 0; border: 2px dashed #bbb;
+    border-radius: 6px; text-align: center; background: #fafafa;
+    cursor: pointer; transition: background .15s, border-color .15s;
   }
-  .upload-zone:hover, .upload-zone.dragover {
-    border-color: var(--accent-blue); background: var(--glow-blue);
+  .upload-zone:hover { background: #f0f4ff; border-color: #1a73e8; }
+  .upload-zone.drag  { background: #e8f0fe; border-color: #1557b0; }
+  .upload-zone .upload-title {
+    font-size: 14px; color: #333; font-weight: 600; margin-bottom: 4px;
   }
-  .upload-zone .label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
-  .upload-zone .filename { font-size: 12px; color: var(--accent-green); margin-top: 6px; font-weight: 600; }
-  .upload-zone input { display: none; }
-
-  .match-preview { margin-top: 10px; }
-  .match-preview table {
-    width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px;
+  .upload-zone .upload-hint-text {
+    font-size: 12px; color: #888;
   }
-  .match-preview th { text-align: left; color: var(--text-muted); padding: 6px 8px; font-size: 11px; text-transform: uppercase; }
-  .match-preview td { padding: 5px 8px; border-top: 1px solid var(--border); color: var(--text-secondary); }
-  .match-preview .matched { color: var(--accent-green); }
-  .match-preview .unmatched { color: var(--accent-red); font-style: italic; }
-
-  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-
-  /* ---- Resize handle ---- */
-  .resize-handle {
-    width: 5px; cursor: col-resize; background: transparent;
-    transition: background 0.15s; flex-shrink: 0;
+  #upload-input { display: none; }
+  .upload-results { margin-top: 14px; font-size: 13px; }
+  .upload-results .ok { color: #2e7d32; }
+  .upload-results .err { color: #c62828; }
+  .upload-results .warn { color: #e65100; }
+  .upload-help {
+    color: #666; font-size: 12px; line-height: 1.5; margin-bottom: 8px;
   }
-  .resize-handle:hover, .resize-handle.active { background: var(--accent-blue); }
+  .upload-help code {
+    background: #f0f0f0; padding: 1px 5px; border-radius: 3px;
+    font-size: 11px; color: #333;
+  }
 
-  /* ---- Scrollbars ---- */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--border-bright); }
+  /* Toast */
+  .toast-container { position: fixed; top: 20px; right: 20px; z-index: 2000;
+                     display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    padding: 12px 20px; border-radius: 8px; color: white; font-size: 13px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.2); max-width: 380px;
+    animation: toastIn .3s ease;
+  }
+  .toast-success { background: #2e7d32; }
+  .toast-info { background: #1a73e8; }
+  .toast-error { background: #c62828; }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(40px); }
+                       to { opacity: 1; transform: none; } }
+
+  /* Hint when nothing selected */
+  .panel-hint { padding: 60px 30px; text-align: center; color: #999;
+                font-size: 13px; line-height: 1.6; }
+
+  /* Keyboard shortcut hint */
+  .kbd {
+    background: #eee; border: 1px solid #ccc; border-bottom-width: 2px;
+    border-radius: 3px; padding: 1px 6px; font-family: monospace;
+    font-size: 11px; color: #555;
+  }
 </style>
 </head>
 <body>
 
-<div class="layout" id="app"></div>
-<div class="toast" id="toast"></div>
+<div class="toast-container" id="toast-container"></div>
+
+<div class="layout">
+
+  <!-- ── Header ── -->
+  <div class="header">
+    <h1>JSON Truth Editor</h1>
+    <span class="subtitle"></span>
+    <div class="spacer"></div>
+    <div class="progress-wrap">
+      <span id="progress-text">0 / 0 verified</span>
+      <div class="progress-bar"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+    </div>
+    <button class="btn-primary btn-sm" onclick="openUploadModal()">Загрузить</button>
+    <button class="btn-secondary btn-sm" onclick="loadPairs()">Обновить</button>
+    <button class="btn-danger btn-sm" onclick="confirmDeleteAll()">Очистить всё</button>
+  </div>
+
+  <!-- ── Main 3-col layout ── -->
+  <div class="main-area" id="main-area">
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3>Пары (<span id="pair-count">0</span>)</h3>
+        <button class="btn-icon btn-ghost" onclick="toggleSidebar()" title="Свернуть список">&laquo;</button>
+      </div>
+      <div class="sidebar-search">
+        <input id="pair-filter" placeholder="Поиск по имени..." oninput="renderPairList()">
+      </div>
+      <div class="sidebar-filter">
+        <button id="filter-all" class="active" onclick="setFilter('all')">Все</button>
+        <button id="filter-pending" onclick="setFilter('pending')">Ждут</button>
+        <button id="filter-verified" onclick="setFilter('verified')">Готовы</button>
+      </div>
+      <div class="pair-list" id="pair-list"></div>
+    </div>
+
+    <!-- Document panel -->
+    <div class="panel doc-panel">
+      <div class="panel-header">
+        <button class="btn-icon btn-ghost" id="sidebar-toggle-btn" onclick="toggleSidebar()"
+                title="Показать/скрыть список пар">Список</button>
+        <h3 id="doc-title">Документ</h3>
+        <button class="btn-sm btn-ghost" id="doc-download-btn" onclick="downloadOriginal()" disabled
+                title="Скачать оригинал документа (PDF/DOCX/...)">Документ</button>
+      </div>
+      <div class="doc-panel-body" id="doc-body">
+        <div class="doc-empty">Выберите пару из списка слева</div>
+      </div>
+    </div>
+
+    <!-- JSON editor panel -->
+    <div class="panel json-panel">
+      <div class="json-tabs">
+        <button class="json-tab active" id="tab-form" onclick="setJsonTab('form')">Форма</button>
+        <button class="json-tab" id="tab-raw" onclick="setJsonTab('raw')">JSON Raw</button>
+        <span class="json-status clean" id="json-status">не загружено</span>
+      </div>
+      <div class="json-toolbar" id="json-toolbar" style="display:none">
+        <div class="tool-group">
+          <button class="btn-success btn-sm" onclick="saveJson()" title="Сохранить на сервер (Ctrl+S)">Сохранить</button>
+          <button class="btn-primary btn-sm" onclick="downloadJson()" title="Скачать текущий JSON-файл (с учётом правок)">Скачать JSON</button>
+          <button class="btn-secondary btn-sm" onclick="resetJson()" title="Откатить все изменения к исходному файлу">Сбросить</button>
+        </div>
+
+        <div class="tool-group">
+          <button class="btn-ghost btn-sm" onclick="insertTemplate('complex')" title="Вставить шаблон complex маршрута (3 точки)">Complex</button>
+          <button class="btn-ghost btn-sm" onclick="insertTemplate('simple')" title="Вставить шаблон simple маршрута (from/to)">Simple</button>
+          <button class="btn-primary btn-sm" id="verify-btn" onclick="toggleVerified()">Подтвердить</button>
+        </div>
+      </div>
+
+      <!-- Form editor (structured) -->
+      <div class="form-body" id="form-body" style="display:none">
+        <div class="empty-state">
+          <h2>Нет данных</h2>
+          <p>Выберите пару слева</p>
+        </div>
+      </div>
+
+      <!-- Raw JSON editor -->
+      <div class="json-body" id="json-body" style="display:none">
+        <textarea id="json-text" spellcheck="false" placeholder='{ "isComplexRoute": true, "points": [...] }'></textarea>
+      </div>
+      <div class="json-error-bar" id="json-error"></div>
+
+      <!-- Empty state when nothing selected -->
+      <div class="form-body" id="json-empty">
+        <div class="empty-state">
+          <h2>Редактор JSON</h2>
+          <p>Выберите пару из списка слева, чтобы начать редактирование.<br>
+             Сочетания клавиш: <span class="kbd">Ctrl+S</span> сохранить ·
+             <span class="kbd">Alt+&uarr;&darr;</span> переход к соседней паре</p>
+          <div class="upload-hint">
+            Пар ещё нет — нажмите <strong>Загрузить</strong> и выберите файлы.
+            Документы и JSON-файлы спарятся автоматически по совпадению имён
+            (<code>order_1.pdf</code> + <code>order_1.json</code>).
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Upload modal ── -->
+<div class="modal-overlay" id="upload-modal" onclick="if(event.target===this)closeUploadModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Загрузка пар</h2>
+      <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="upload-help">
+        Документы (.pdf / .docx / .doc / .txt) и JSON-файлы спарятся автоматически
+        по совпадению имени без расширения. Например, <code>order_1.pdf</code> + <code>order_1.json</code>.
+      </div>
+      <label class="upload-zone" id="upload-zone" for="upload-input">
+        <div class="upload-title">Выберите файлы или перетащите сюда</div>
+        <div class="upload-hint-text">Поддерживаются .pdf, .doc, .docx, .txt и .json</div>
+      </label>
+      <input id="upload-input" type="file" multiple accept=".pdf,.doc,.docx,.txt,.json"
+             onchange="handleUpload(this.files)">
+      <div class="upload-results" id="upload-results"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Validation modal ── -->
+<div class="modal-overlay" id="validate-modal" onclick="if(event.target===this)closeValidateModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Проверка шейпа Stage 2</h2>
+      <button class="modal-close" onclick="closeValidateModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="validate-body"></div>
+  </div>
+</div>
 
 <script>
-// ============ State ============
-let pairs = [];
-let activePairId = null;
-let jsonData = null;
-let modified = false;
-let editorTab = 'form';
-let showModal = false;
-let sidebarCollapsed = false;
-let uploading = false;
-let previewType = null;
-
-// Batch upload state
-let uploadDocs = [];   // File[]
-let uploadJsons = [];  // File[]
-
-// ============ API ============
-const api = {
-  async list() {
-    const r = await fetch('/api/pairs');
-    if (!r.ok) throw new Error('Failed to list');
-    return r.json();
-  },
-  async getJson(id) {
-    const r = await fetch(`/api/pairs/${id}/json`);
-    if (!r.ok) throw new Error('Failed to load JSON');
-    return r.json();
-  },
-  async saveJson(id, data) {
-    const r = await fetch(`/api/pairs/${id}/json`, {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(data),
-    });
-    if (!r.ok) throw new Error('Failed to save');
-    return r.json();
-  },
-  async batchUpload(files) {
-    const fd = new FormData();
-    files.forEach(f => fd.append('files', f));
-    const r = await fetch('/api/pairs/batch', { method: 'POST', body: fd });
-    if (!r.ok) {
-      const e = await r.json().catch(() => ({}));
-      throw new Error(e.detail || 'Upload failed');
-    }
-    return r.json();
-  },
-  async verify(id) {
-    const r = await fetch(`/api/pairs/${id}/verify`, { method: 'PATCH' });
-    if (!r.ok) throw new Error('Failed');
-    return r.json();
-  },
-  async deletePair(id) {
-    const r = await fetch(`/api/pairs/${id}`, { method: 'DELETE' });
-    if (!r.ok) throw new Error('Failed');
-  },
-  async deleteAll() {
-    const r = await fetch('/api/pairs', { method: 'DELETE' });
-    if (!r.ok) throw new Error('Failed');
-    return r.json();
-  },
-  docUrl(id) { return `/api/pairs/${id}/document`; },
+// ═══════════════════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════════════════
+let _pairs = [];
+let _currentId = null;
+let _currentJson = null;     // Stage 2 shape, что редактируем в форме
+let _envelope = null;        // обёртка extraction_result, если была (source_file, mode, model, ...)
+let _envelopeKey = null;     // имя ключа внутри обёртки, в которой лежит Stage 2 (обычно "extraction_result")
+let _lastSaved = null;
+let _jsonTab = 'form';
+let _filter = 'all';
+let _enums = {
+  pointType: ['pickup_empty','pickup_loaded','wash','load','dropoff_loaded','return_empty','other'],
+  containerType: ['HC','DC','RF','OT','FR'],
+  containerSize: ["20'","40'","40'HC","45'HC"],
+  containerStatus: ['loaded','empty'],
 };
 
-// ============ Helpers ============
-function showToast(msg, error = false) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast show' + (error ? ' error' : '');
-  setTimeout(() => t.classList.remove('show'), 2500);
+// ═══════════════════════════════════════════════════════════════════════
+// API helpers
+// ═══════════════════════════════════════════════════════════════════════
+async function api(url, opts) {
+  const o = opts || {};
+  if (o.body && typeof o.body !== 'string' && !(o.body instanceof FormData)) {
+    o.body = JSON.stringify(o.body);
+    o.headers = {...(o.headers||{}), 'Content-Type': 'application/json'};
+  }
+  const r = await fetch(url, o);
+  if (!r.ok) {
+    let detail = r.statusText;
+    try { detail = (await r.json()).detail || detail; } catch(e){}
+    throw new Error(detail);
+  }
+  const ct = r.headers.get('content-type') || '';
+  return ct.includes('application/json') ? r.json() : r.text();
 }
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-function val(v) { return v == null ? '' : String(v); }
-function parseVal(v, type) {
-  const s = v.trim();
-  if (s === '' || s === 'null') return null;
-  if (type === 'number') { const n = parseFloat(s); return isNaN(n) ? null : n; }
-  return s;
+
+function showToast(msg, type='info', dur=2500) {
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => {
+    el.style.opacity = '0'; el.style.transition = 'opacity .3s';
+    setTimeout(() => el.remove(), 300);
+  }, dur);
 }
-function stem(filename) { return filename.replace(/\.[^.]+$/, ''); }
 
-const DOC_EXT = new Set(['.pdf', '.doc', '.docx', '.txt']);
-function isDoc(name) { const e = name.match(/\.[^.]+$/); return e && DOC_EXT.has(e[0].toLowerCase()); }
-function isJson(name) { return name.toLowerCase().endsWith('.json'); }
-
-// ============ Actions ============
+// ═══════════════════════════════════════════════════════════════════════
+// Pair list
+// ═══════════════════════════════════════════════════════════════════════
 async function loadPairs() {
-  try {
-    pairs = await api.list();
-    render();
-  } catch (e) { showToast(e.message, true); }
+  try { _pairs = await api('/api/pairs'); }
+  catch(e) { showToast('Ошибка загрузки списка: ' + e.message, 'error'); return; }
+  renderPairList();
+  renderProgress();
+  // Если текущей пары больше нет — сбрасываем выбор
+  if (_currentId && !_pairs.find(p => p.id === _currentId)) {
+    _currentId = null;
+    showEmptyState();
+  }
 }
 
+function renderProgress() {
+  const total = _pairs.length;
+  const verified = _pairs.filter(p => p.verified).length;
+  document.getElementById('pair-count').textContent = total;
+  document.getElementById('progress-text').textContent = `${verified}/${total} verified`;
+  document.getElementById('progress-fill').style.width = total ? (verified/total*100) + '%' : '0%';
+}
+
+function renderPairList() {
+  const filterText = (document.getElementById('pair-filter').value || '').toLowerCase();
+  const list = document.getElementById('pair-list');
+  let pairs = _pairs;
+  if (_filter === 'verified') pairs = pairs.filter(p => p.verified);
+  else if (_filter === 'pending') pairs = pairs.filter(p => !p.verified);
+  if (filterText) pairs = pairs.filter(p =>
+    (p.document_name||'').toLowerCase().includes(filterText) ||
+    (p.json_name||'').toLowerCase().includes(filterText));
+
+  if (!pairs.length) {
+    list.innerHTML = '<div style="padding:30px 12px;text-align:center;color:#aaa;font-size:13px">Нет пар по фильтру</div>';
+    return;
+  }
+  list.innerHTML = pairs.map(p => `
+    <div class="pair-item ${p.id === _currentId ? 'active' : ''} ${p.verified ? 'verified' : ''}"
+         onclick="selectPair('${p.id}')">
+      <div class="pair-name">${escapeHtml(p.document_name || 'unknown')}</div>
+      <div class="pair-meta">
+        <span class="ext-badge">${(p.document_ext || '').replace('.', '')}</span>
+        ${p.verified ? '<span class="verified-badge">verified</span>' : '<span style="color:#bbb">pending</span>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+function setFilter(f) {
+  _filter = f;
+  document.querySelectorAll('.sidebar-filter button').forEach(b => b.classList.remove('active'));
+  document.getElementById('filter-' + f).classList.add('active');
+  renderPairList();
+}
+
+function escapeHtml(s) {
+  return String(s||'').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Pair selection
+// ═══════════════════════════════════════════════════════════════════════
 async function selectPair(id) {
-  if (modified && !confirm('Есть несохранённые изменения. Переключить?')) return;
-  activePairId = id;
-  modified = false;
-  editorTab = 'form';
-  const pair = pairs.find(p => p.id === id);
-  previewType = pair ? (pair.document_ext === '.txt' ? 'txt' : (pair.document_ext === '.doc' || pair.document_ext === '.docx' ? 'html' : 'pdf')) : null;
-  try {
-    jsonData = await api.getJson(id);
-    render();
-  } catch (e) { showToast(e.message, true); }
-}
+  if (_currentId === id) return;
+  if (isDirty() && !confirm('Несохранённые изменения. Перейти к другой паре?')) return;
 
-async function saveCurrentJson() {
-  if (!activePairId || !jsonData) return;
-  try {
-    await api.saveJson(activePairId, jsonData);
-    modified = false;
-    showToast('Сохранено ✓');
-    renderModDot();
-  } catch (e) { showToast(e.message, true); }
-}
+  _currentId = id;
+  const pair = _pairs.find(p => p.id === id);
+  if (!pair) return;
 
-async function toggleVerify() {
-  if (!activePairId) return;
-  try {
-    const res = await api.verify(activePairId);
-    const idx = pairs.findIndex(p => p.id === activePairId);
-    if (idx >= 0) pairs[idx].verified = res.verified;
-    render();
-    showToast(res.verified ? 'Verified ✓' : 'Unverified');
-  } catch (e) { showToast(e.message, true); }
-}
+  // Show toolbar + bodies
+  document.getElementById('json-toolbar').style.display = 'flex';
+  document.getElementById('json-empty').style.display = 'none';
+  renderPairList();
+  updateVerifyButton(pair.verified);
 
-async function deletePair(id) {
-  if (!confirm('Удалить эту пару?')) return;
-  try {
-    await api.deletePair(id);
-    if (activePairId === id) { activePairId = null; jsonData = null; modified = false; }
-    await loadPairs();
-    showToast('Удалено');
-  } catch (e) { showToast(e.message, true); }
-}
+  // Document panel
+  document.getElementById('doc-title').textContent = pair.document_name;
+  document.getElementById('doc-download-btn').disabled = false;
+  loadDocPreview(pair);
 
-async function deleteAllPairs() {
-  if (!confirm(`Удалить ВСЕ ${pairs.length} пар? Это необратимо.`)) return;
+  // JSON load
   try {
-    const res = await api.deleteAll();
-    activePairId = null; jsonData = null; modified = false;
-    await loadPairs();
-    showToast(`Удалено ${res.count} пар`);
-  } catch (e) { showToast(e.message, true); }
-}
-
-// ---- Batch matching ----
-function getMatches() {
-  const docMap = {};
-  const jsonMap = {};
-  uploadDocs.forEach(f => { docMap[stem(f.name)] = f.name; });
-  uploadJsons.forEach(f => { jsonMap[stem(f.name)] = f.name; });
-  const allStems = new Set([...Object.keys(docMap), ...Object.keys(jsonMap)]);
-  const rows = [];
-  for (const s of [...allStems].sort()) {
-    rows.push({ stem: s, doc: docMap[s] || null, json: jsonMap[s] || null, matched: !!(docMap[s] && jsonMap[s]) });
-  }
-  return rows;
-}
-
-async function doBatchUpload() {
-  const allFiles = [...uploadDocs, ...uploadJsons];
-  if (allFiles.length === 0) return;
-  uploading = true;
-  render();
-  try {
-    const res = await api.batchUpload(allFiles);
-    showModal = false;
-    uploadDocs = [];
-    uploadJsons = [];
-    uploading = false;
-    await loadPairs();
-    const ct = res.created.length;
-    const unDoc = res.unmatched_documents?.length || 0;
-    const unJson = res.unmatched_jsons?.length || 0;
-    let msg = `Создано ${ct} пар`;
-    if (unDoc || unJson) msg += ` | Без пары: ${unDoc} док, ${unJson} json`;
-    showToast(msg, (ct === 0));
-    if (ct > 0) await selectPair(res.created[0].id);
-  } catch (e) {
-    uploading = false;
-    render();
-    showToast(e.message, true);
+    const data = await api(`/api/pairs/${id}/json`);
+    const unwrapped = unwrapEnvelope(data);
+    _envelope     = unwrapped.envelope;
+    _envelopeKey  = unwrapped.key;
+    _currentJson  = unwrapped.inner;
+    _lastSaved    = JSON.stringify(_currentJson);
+    setStatus('clean', 'загружено');
+    document.getElementById('json-text').value = JSON.stringify(_currentJson, null, 2);
+    renderForm();
+    renderRaw();
+    // Activate the currently selected tab so its panel actually becomes visible
+    // (без этого после первой загрузки оба body оставались display:none).
+    setJsonTab(_jsonTab);
+  } catch(e) {
+    showToast('Ошибка загрузки JSON: ' + e.message, 'error');
   }
 }
 
-// ============ Data accessors (handle wrapper structure) ============
-// JSON has: { source_file, mode, model, extraction_result: {...}, meta: {...} }
-// Form edits extraction_result; JSON Raw shows the full file
-function getER() {
-  if (!jsonData) return null;
-  // Support both wrapped and flat formats
-  return jsonData.extraction_result || jsonData;
-}
-
-// ============ Data mutation ============
-function updateField(key, value) {
-  const er = getER();
-  if (!er) return;
-  er[key] = parseVal(value, 'string');
-  modified = true;
-  syncJsonRaw();
-  renderModDot();
-}
-
-function updateContainerField(idx, key, value) {
-  const er = getER();
-  if (!er?.containers?.[idx]) return;
-  const type = (key === 'cargoWeight') ? 'number' : (key === 'isUnnumbered') ? 'bool' : 'string';
-  if (type === 'bool') {
-    const s = value.trim().toLowerCase();
-    er.containers[idx][key] = (s === 'true') ? true : (s === 'false') ? false : null;
-  } else {
-    er.containers[idx][key] = parseVal(value, type);
+// Принимает либо «голую» Stage 2-форму, либо обёртку с extraction_result/data/result/result_json/json/output.
+// Возвращает { inner, envelope, key }: inner — то, что редактируем; envelope — оригинал без inner (для сохранения).
+function unwrapEnvelope(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    return { inner: data, envelope: null, key: null };
   }
-  modified = true;
-  syncJsonRaw();
-  renderModDot();
-}
-
-function addContainer() {
-  const er = getER();
-  if (!er) return;
-  if (!er.containers) er.containers = [];
-  er.containers.push({
-    containerNumber: null, containerType: null, containerSize: null,
-    status: null, cargoWeight: null, isUnnumbered: null, pinCode: null, comment: null
-  });
-  modified = true;
-  renderFormContent();
-  syncJsonRaw();
-}
-
-function removeContainer(idx) {
-  const er = getER();
-  if (!er?.containers) return;
-  er.containers.splice(idx, 1);
-  modified = true;
-  renderFormContent();
-  syncJsonRaw();
-}
-
-// ---- RoutePoints ----
-function updateRouteField(idx, key, value) {
-  const er = getER();
-  if (!er?.routePoints?.[idx]) return;
-  if (key === 'order') {
-    er.routePoints[idx][key] = parseInt(value) || null;
-  } else if (key === 'containerRefs') {
-    // Parse comma-separated indices: "0, 1, 2" → [0, 1, 2]
-    const refs = value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
-    er.routePoints[idx][key] = refs.length ? refs : null;
-  } else {
-    er.routePoints[idx][key] = parseVal(value, 'string');
+  // Эвристика "это уже Stage 2": есть isComplexRoute / points / containers / from / fromAddress.
+  const stage2Keys = ['isComplexRoute','points','containers','from','to','fromAddress','toAddress'];
+  if (stage2Keys.some(k => k in data)) {
+    return { inner: data, envelope: null, key: null };
   }
-  modified = true;
-  syncJsonRaw();
-  renderModDot();
-}
-
-function addRoutePoint() {
-  const er = getER();
-  if (!er) return;
-  if (!er.routePoints) er.routePoints = [];
-  const nextOrder = er.routePoints.length ? Math.max(...er.routePoints.map(r => r.order || 0)) + 1 : 1;
-  er.routePoints.push({
-    order: nextOrder, type: 'other', rawAddress: '', normalizedAddress: null,
-    plannedDate: null, plannedTime: null, containerRefs: [0], comment: null
-  });
-  modified = true;
-  renderFormContent();
-  syncJsonRaw();
-}
-
-function removeRoutePoint(idx) {
-  const er = getER();
-  if (!er?.routePoints) return;
-  er.routePoints.splice(idx, 1);
-  modified = true;
-  renderFormContent();
-  syncJsonRaw();
-}
-
-function moveRoutePoint(idx, dir) {
-  const er = getER();
-  if (!er?.routePoints) return;
-  const target = idx + dir;
-  if (target < 0 || target >= er.routePoints.length) return;
-  [er.routePoints[idx], er.routePoints[target]] = [er.routePoints[target], er.routePoints[idx]];
-  // Re-number orders
-  er.routePoints.forEach((rp, i) => { rp.order = i + 1; });
-  modified = true;
-  renderFormContent();
-  syncJsonRaw();
-}
-
-function onRawJsonInput(text) {
-  try {
-    jsonData = JSON.parse(text);
-    modified = true;
-    renderModDot();
-  } catch {}
-}
-
-function syncJsonRaw() {
-  const el = document.getElementById('json-raw');
-  if (el) el.value = JSON.stringify(jsonData, null, 2);
-}
-
-function renderModDot() {
-  const dot = document.getElementById('mod-dot');
-  if (dot) dot.style.display = modified ? 'inline-block' : 'none';
-}
-
-function switchTab(tab) {
-  editorTab = tab;
-  // Update tab highlight
-  document.querySelectorAll('.editor-tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.tab === tab);
-  });
-  // Render editor body content
-  renderEditorBody();
-}
-
-function toggleSidebar() {
-  sidebarCollapsed = !sidebarCollapsed;
-  const sb = document.getElementById('sidebar');
-  if (sb) sb.classList.toggle('collapsed', sidebarCollapsed);
-}
-
-// ============ Rendering ============
-const FIELDS = [
-  {key:'fromAddress', label:'Адрес отправления (from)', multi:true},
-  {key:'pickupDate', label:'Дата подачи', ph:'YYYY-MM-DD'},
-  {key:'pickupTime', label:'Время подачи', ph:'HH:MM'},
-  {key:'toAddress', label:'Адрес доставки (to)', multi:true},
-  {key:'deliveryDate', label:'Дата доставки', ph:'YYYY-MM-DD'},
-  {key:'deliveryTime', label:'Время доставки', ph:'HH:MM'},
-  {key:'contacts', label:'Контакты', multi:true},
-  {key:'comments', label:'Комментарии', multi:true},
-];
-const CFIELDS = [
-  {key:'containerNumber', label:'Номер (ISO 6346)', ph:'MSCU1234567'},
-  {key:'containerType', label:'Тип', ph:'HC/DC/RF/OT/FR'},
-  {key:'containerSize', label:'Размер', ph:"40'HC"},
-  {key:'status', label:'Статус', ph:'loaded/empty'},
-  {key:'cargoWeight', label:'Вес (кг)', ph:'25000'},
-  {key:'isUnnumbered', label:'Безномерной', ph:'true/false'},
-  {key:'pinCode', label:'ПИН-код', ph:'0796'},
-  {key:'comment', label:'Комментарий к ктк', ph:'Сухой, целый...', full:true},
-];
-const RP_TYPES = ['pickup_empty','pickup_loaded','wash','load','dropoff_loaded','return_empty','other'];
-
-function buildFormHTML(data) {
-  if (!data) return '';
-  const er = data.extraction_result || data;
-  let h = '';
-
-  // ---- Meta info (read-only) ----
-  if (data.extraction_result) {
-    h += `<div class="container-section" style="margin-bottom:16px;border-color:var(--border)">
-      <div style="font-size:11px;color:var(--text-muted);display:flex;gap:16px;flex-wrap:wrap">
-        <span>📄 ${esc(data.source_file || '—')}</span>
-        <span>🤖 ${esc(data.model || '—')}</span>
-        <span>📝 ${esc(data.raw_text_method || '—')}</span>
-        ${data.meta?.ocr_confidence ? `<span>OCR: ${data.meta.ocr_confidence}%</span>` : ''}
-      </div>
-    </div>`;
-  }
-
-  // ---- Main fields ----
-  h += '<div style="font-size:12px;font-weight:700;color:var(--accent-purple);margin-bottom:8px;text-transform:uppercase">Основные поля</div>';
-  FIELDS.forEach(f => {
-    const v = val(er[f.key]);
-    const isNull = er[f.key] == null;
-    if (f.multi) {
-      h += `<div class="field-group"><div class="field-label">${f.label}</div>
-        <textarea class="field-input ${isNull?'null-val':''}" placeholder="${f.ph||f.label}"
-          oninput="updateField('${f.key}',this.value);this.classList.remove('null-val')">${isNull?'':esc(v)}</textarea></div>`;
-    } else {
-      h += `<div class="field-group"><div class="field-label">${f.label}</div>
-        <input class="field-input ${isNull?'null-val':''}" type="text" value="${esc(isNull?'':v)}"
-          placeholder="${f.ph||f.label}" oninput="updateField('${f.key}',this.value);this.classList.remove('null-val')"></div>`;
+  // Иначе ищем известный wrapper-key.
+  const candidates = ['extraction_result','data','result','result_json','json','output','payload'];
+  for (const k of candidates) {
+    const v = data[k];
+    if (v && typeof v === 'object' && !Array.isArray(v) &&
+        stage2Keys.some(sk => sk in v)) {
+      const env = {...data};
+      delete env[k];
+      return { inner: v, envelope: env, key: k };
     }
-  });
+  }
+  // Не понятно — редактируем как есть.
+  return { inner: data, envelope: null, key: null };
+}
 
-  // ---- Containers ----
-  h += '<div style="font-size:12px;font-weight:700;color:var(--accent-cyan);margin:16px 0 8px;text-transform:uppercase">Контейнеры</div>';
-  (er.containers||[]).forEach((c,i) => {
-    h += `<div class="container-section"><div class="container-header">
-      <span>Контейнер #${i+1} ${c.containerNumber ? '— '+esc(c.containerNumber) : c.isUnnumbered ? '— безномерной' : ''}</span>
-      <button class="btn danger sm" onclick="removeContainer(${i})">Удалить</button></div>
-      <div class="container-fields">`;
-    CFIELDS.forEach(f => {
-      const cv = val(c[f.key]); const isNull = c[f.key]==null;
-      h += `<div class="field-group ${f.full?'full':''}"><div class="field-label">${f.label}</div>
-        <input class="field-input ${isNull?'null-val':''}" type="text" value="${esc(isNull?'':cv)}"
-          placeholder="${f.ph||''}" oninput="updateContainerField(${i},'${f.key}',this.value);this.classList.remove('null-val')"></div>`;
+// Обратная упаковка: если был envelope, кладём inner внутрь по тому же ключу.
+function wrapEnvelope(inner) {
+  if (!_envelope || !_envelopeKey) return inner;
+  return {..._envelope, [_envelopeKey]: inner};
+}
+
+function loadDocPreview(pair) {
+  const body = document.getElementById('doc-body');
+  const url = `/api/pairs/${pair.id}/document`;
+  const ext = pair.document_ext;
+  if (ext === '.pdf') {
+    // Не используем sandbox — Chrome PDF viewer требует выполнения скриптов
+    // внутри iframe. Источник один и тот же (наш бэкенд), CSP это разрешает.
+    body.innerHTML = `<iframe src="${url}" type="application/pdf"></iframe>`;
+  } else if (ext === '.docx' || ext === '.doc') {
+    // HTML-preview: можно безопасно прятать скрипты sandbox'ом.
+    body.innerHTML = `<iframe src="${url}" sandbox="allow-same-origin"></iframe>`;
+  } else if (ext === '.txt') {
+    body.innerHTML = `<pre id="doc-pre">Загрузка...</pre>`;
+    fetch(url).then(r => r.text()).then(t => {
+      document.getElementById('doc-pre').textContent = t;
     });
-    h += '</div></div>';
-  });
-  h += '<button class="add-container-btn" onclick="addContainer()">+ Добавить контейнер</button>';
-
-  // ---- Route Points ----
-  h += '<div style="font-size:12px;font-weight:700;color:var(--accent-yellow);margin:20px 0 8px;text-transform:uppercase">Маршрутные точки (routePoints)</div>';
-  const rps = er.routePoints || [];
-  if (rps.length === 0) {
-    h += '<div style="color:var(--text-muted);font-size:12px;margin-bottom:8px">null — нет маршрутных точек (простой маршрут откуда→куда)</div>';
-  }
-  rps.forEach((rp, i) => {
-    const typeColor = {pickup_empty:'#22d3ee',pickup_loaded:'#34d399',wash:'#a78bfa',load:'#fbbf24',dropoff_loaded:'#f87171',return_empty:'#8888a8',other:'#555570'}[rp.type]||'#555570';
-    h += `<div class="container-section" style="border-left:3px solid ${typeColor}">
-      <div class="container-header">
-        <span style="display:flex;align-items:center;gap:6px">
-          <span style="font-size:14px;font-weight:700;color:var(--accent-blue)">#${rp.order||i+1}</span>
-          <span style="color:${typeColor};font-weight:600;font-size:12px">${esc(rp.type||'other')}</span>
-        </span>
-        <span style="display:flex;gap:4px">
-          <button class="btn sm" onclick="moveRoutePoint(${i},-1)" ${i===0?'disabled':''}>↑</button>
-          <button class="btn sm" onclick="moveRoutePoint(${i},1)" ${i===rps.length-1?'disabled':''}>↓</button>
-          <button class="btn danger sm" onclick="removeRoutePoint(${i})">✕</button>
-        </span>
-      </div>
-      <div class="container-fields">
-        <div class="field-group"><div class="field-label">Тип</div>
-          <select class="field-input" onchange="updateRouteField(${i},'type',this.value)">
-            ${RP_TYPES.map(t => `<option value="${t}" ${t===rp.type?'selected':''}>${t}</option>`).join('')}
-          </select></div>
-        <div class="field-group"><div class="field-label">Дата</div>
-          <input class="field-input ${rp.plannedDate==null?'null-val':''}" type="text" value="${esc(val(rp.plannedDate))}"
-            placeholder="YYYY-MM-DD" oninput="updateRouteField(${i},'plannedDate',this.value);this.classList.remove('null-val')"></div>
-        <div class="field-group full"><div class="field-label">Адрес (rawAddress)</div>
-          <input class="field-input ${rp.rawAddress==null?'null-val':''}" type="text" value="${esc(val(rp.rawAddress))}"
-            placeholder="Адрес как в документе" oninput="updateRouteField(${i},'rawAddress',this.value);this.classList.remove('null-val')"></div>
-        <div class="field-group"><div class="field-label">Время</div>
-          <input class="field-input ${rp.plannedTime==null?'null-val':''}" type="text" value="${esc(val(rp.plannedTime))}"
-            placeholder="HH:MM" oninput="updateRouteField(${i},'plannedTime',this.value);this.classList.remove('null-val')"></div>
-        <div class="field-group"><div class="field-label">containerRefs</div>
-          <input class="field-input" type="text" value="${(rp.containerRefs||[]).join(', ')}"
-            placeholder="0, 1, 2" oninput="updateRouteField(${i},'containerRefs',this.value)"></div>
-        <div class="field-group full"><div class="field-label">Комментарий</div>
-          <input class="field-input ${rp.comment==null?'null-val':''}" type="text" value="${esc(val(rp.comment))}"
-            placeholder="" oninput="updateRouteField(${i},'comment',this.value);this.classList.remove('null-val')"></div>
-      </div>
-    </div>`;
-  });
-  h += '<button class="add-container-btn" onclick="addRoutePoint()">+ Добавить маршрутную точку</button>';
-
-  return h;
-}
-
-function renderFormContent() {
-  const el = document.getElementById('form-scroll');
-  if (el && jsonData) el.innerHTML = buildFormHTML(jsonData);
-}
-
-function renderEditorBody() {
-  const body = document.getElementById('editor-body');
-  if (!body || !jsonData) return;
-  if (editorTab === 'form') {
-    body.innerHTML = `<div class="form-scroll" id="form-scroll">${buildFormHTML(jsonData)}</div>`;
   } else {
-    body.innerHTML = `<textarea class="json-raw" id="json-raw" oninput="onRawJsonInput(this.value)">${esc(JSON.stringify(jsonData,null,2))}</textarea>`;
+    body.innerHTML = `<div class="doc-empty">Предпросмотр недоступен для ${ext}</div>`;
   }
 }
 
-function render() {
-  const pair = pairs.find(p => p.id === activePairId);
-  let h = '';
+function downloadOriginal() {
+  if (!_currentId) return;
+  window.open(`/api/pairs/${_currentId}/original`, '_blank');
+}
 
-  // ---- Top Bar ----
-  h += `<div class="top-bar">
-    <button class="btn icon-btn" onclick="toggleSidebar()" title="Панель документов">☰</button>
-    <h1>JSON Truth Editor</h1>
-    <span class="spacer"></span>
-    <span style="color:var(--text-muted);font-size:12px">${pairs.length} пар</span>
-    ${pairs.length ? '<button class="btn danger" onclick="deleteAllPairs()">🗑 Удалить все</button>' : ''}
-    <button class="btn primary" onclick="showModal=true;render()">⬆ Загрузить</button>
+function showEmptyState() {
+  document.getElementById('json-toolbar').style.display = 'none';
+  document.getElementById('json-empty').style.display = 'block';
+  document.getElementById('form-body').style.display = 'none';
+  document.getElementById('json-body').style.display = 'none';
+  document.getElementById('doc-body').innerHTML = '<div class="doc-empty">Выберите пару из списка слева</div>';
+  document.getElementById('doc-title').textContent = 'Документ';
+  document.getElementById('doc-download-btn').disabled = true;
+  _currentJson = null; _envelope = null; _envelopeKey = null; _lastSaved = null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// JSON editor — Raw mode
+// ═══════════════════════════════════════════════════════════════════════
+function setJsonTab(tab) {
+  _jsonTab = tab;
+  document.getElementById('tab-form').classList.toggle('active', tab === 'form');
+  document.getElementById('tab-raw').classList.toggle('active', tab === 'raw');
+  if (_currentId) {
+    document.getElementById('form-body').style.display = tab === 'form' ? 'block' : 'none';
+    document.getElementById('json-body').style.display = tab === 'raw' ? 'block' : 'none';
+  }
+  if (tab === 'form') renderForm();
+  if (tab === 'raw') renderRaw();
+}
+
+function renderRaw() {
+  const ta = document.getElementById('json-text');
+  ta.value = JSON.stringify(_currentJson, null, 2);
+  hideJsonError();
+}
+
+function onRawInput() {
+  const txt = document.getElementById('json-text').value;
+  try {
+    _currentJson = JSON.parse(txt);
+    setStatus(isDirty() ? 'dirty' : 'clean', isDirty() ? 'не сохранено' : 'сохранено');
+    hideJsonError();
+  } catch(e) {
+    setStatus('invalid', 'не валидный JSON');
+    showJsonError(e.message);
+  }
+}
+
+function showJsonError(msg) {
+  const bar = document.getElementById('json-error');
+  bar.textContent = msg;
+  bar.classList.add('visible');
+}
+function hideJsonError() {
+  document.getElementById('json-error').classList.remove('visible');
+}
+
+function prettyJson() {
+  if (!_currentJson) return;
+  document.getElementById('json-text').value = JSON.stringify(_currentJson, null, 2);
+  showToast('Отформатировано', 'success');
+}
+
+function resetJson() {
+  if (!_currentId) return;
+  if (!confirm('Сбросить все правки к исходному файлу с сервера?')) return;
+  // Перечитываем оригинал с сервера — это реальный «откат к исходнику».
+  selectPairForce(_currentId);
+}
+
+// Принудительный re-load пары даже если она уже выбрана (используется для Сброса).
+async function selectPairForce(id) {
+  _currentId = null;
+  await selectPair(id);
+}
+
+// Скачивание текущего JSON-файла (вместе с обёрткой extraction_result, если она была).
+function downloadJson() {
+  if (!_currentJson || !_currentId) { showToast('Нет данных', 'error'); return; }
+  // Если открыт raw-режим — берём текущий текст textarea (синхронизирован с правками).
+  let payload;
+  if (_jsonTab === 'raw') {
+    const txt = document.getElementById('json-text').value;
+    try { payload = JSON.parse(txt); }
+    catch(e) { showToast('Невалидный JSON: ' + e.message, 'error'); return; }
+  } else {
+    payload = _currentJson;
+  }
+  const wrapped = wrapEnvelope(payload);
+  const pair = _pairs.find(p => p.id === _currentId);
+  const baseName = pair ? pair.document_name.replace(/\.[^.]+$/, '') : 'truth';
+  const blob = new Blob([JSON.stringify(wrapped, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${baseName}.json`;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// JSON editor — Form mode (structured Stage 2 view)
+// ═══════════════════════════════════════════════════════════════════════
+// Build the form layout in the same visual style as the production
+// `request-form-v2` component:
+//   • toggle "Сложный маршрут" сверху,
+//   • simple-mode: card "А / Откуда" + "Б / Куда" + global containers section,
+//   • complex-mode: ordered point cards А → 1 → 2 → … → Б c inline-контейнерами,
+//     "+ Добавить промежуточную точку" между последней intermediate и Б,
+//   • footer "N точек · M контейнеров".
+function renderForm() {
+  if (!_currentJson) return;
+  const body = document.getElementById('form-body');
+  const j = _currentJson;
+  const isComplex = j.isComplexRoute === true;
+  const points = Array.isArray(j.points) ? j.points : [];
+  const containers = Array.isArray(j.containers) ? j.containers : [];
+
+  let html = '';
+
+  // ── Toggle Сложный маршрут ──
+  html += `<div class="toggle-row">
+    <div class="toggle-text">
+      <div class="title">Сложный маршрут</div>
+      <div class="hint">Включите, если в заявке больше двух операционных точек
+        </div>
+    </div>
+    <div class="switch ${isComplex ? 'on' : ''}" onclick="toggleComplex()" title="Toggle isComplexRoute"></div>
   </div>`;
 
-  h += '<div class="main-area">';
-
-  // ---- Sidebar ----
-  h += `<div class="sidebar ${sidebarCollapsed?'collapsed':''}" id="sidebar">
-    <div class="sidebar-header"><span>Документы</span></div>
-    <div class="pair-list">`;
-  if (!pairs.length) {
-    h += '<div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px">Нет пар</div>';
-  }
-  pairs.forEach(p => {
-    h += `<div class="pair-item ${p.id===activePairId?'active':''}" onclick="selectPair('${p.id}')">
-      <div class="pair-name">${esc(p.document_name)}</div>
-      <div class="pair-meta">
-        <span>${esc(p.json_name)}</span>
-        ${p.verified ? '<span class="badge badge-verified">✓</span>' : '<span class="badge badge-pending">…</span>'}
-      </div>
+  // ── Маршрут ──
+  if (!isComplex) {
+    // SIMPLE: A (Откуда) + Б (Куда) + global containers
+    const fromPt = ensureSimplePoint('from');
+    const toPt   = ensureSimplePoint('to');
+    html += `<div class="form-section">
+      <h4>Маршрут (простой)</h4>
+      <p class="section-explainer">
+        Простой режим: задайте адрес отправления (А / Откуда) и адрес назначения (Б / Куда).
+      </p>
+      ${renderSimplePointCard('А', 'Откуда', 'from', fromPt, 'start')}
+      ${renderSimplePointCard('Б', 'Куда',   'to',   toPt,   'end')}
     </div>`;
-  });
-  h += '</div></div>';
 
-  // ---- Workspace ----
-  if (!activePairId || !jsonData) {
-    h += `<div class="workspace empty"><div class="empty-state">
-      <div class="icon">📋</div>
-      <p style="font-size:16px;margin-bottom:8px">Выберите пару или загрузите новые</p>
-      <p style="font-size:13px">Документы + JSON с одинаковыми именами</p>
-    </div></div>`;
+    html += `<div class="form-section">
+      <h4>Контейнеры <span class="count">${containers.length}</span></h4>
+      <p class="section-explainer">
+        В простом маршруте контейнеры описываются один раз. Статус — состояние
+        контейнера на протяжении всей перевозки.
+      </p>
+      ${containers.map((c, ci) => renderContainerCardV2(c, `containers.${ci}`, ci, -1)).join('')}
+      <button class="add-ctr-btn" onclick="addContainerSimple()">+ Добавить контейнер</button>
+    </div>`;
   } else {
-    h += '<div class="workspace">';
+    // COMPLEX: ordered points; "+ Add intermediate" между intermediate и Б
+    html += `<div class="form-section">
+      <h4>Точки маршрута <span class="count">${points.length}</span></h4>`;
 
-    // Left: Preview
-    h += '<div class="pane" id="preview-pane">';
-    h += `<div class="pane-header">
-      <span class="dot" style="background:var(--accent-purple)"></span>
-      ${esc(pair ? pair.document_name : '')}
-      <span class="spacer"></span>
-      <a class="btn sm" href="/api/pairs/${activePairId}/original" download title="Скачать оригинал">⬇</a>
-    </div>`;
-    if (previewType === 'txt') {
-      h += '<div class="preview-text" id="preview-text">Загрузка…</div>';
+    if (points.length === 0) {
+      html += `<p class="section-explainer">Нет точек. Используйте кнопку ниже.</p>
+        <button class="add-point-btn" onclick="addPoint()">+ Добавить точку</button>`;
     } else {
-      // pdf and html both render in iframe
-      h += `<iframe class="preview-frame" id="preview-frame" src="${api.docUrl(activePairId)}"></iframe>`;
+      const lastIntermediateIdx = points.length - 2;
+      // First → last-intermediate → ADD button → final B
+      for (let i = 0; i <= lastIntermediateIdx; i++) {
+        html += renderComplexPointCard(points[i], i, points.length);
+      }
+      if (points.length >= 2) {
+        html += `<button class="add-point-btn" onclick="addPoint()">+ Добавить промежуточную точку</button>`;
+      }
+      if (points.length >= 1) {
+        const last = points.length - 1;
+        if (last !== 0) html += renderComplexPointCard(points[last], last, points.length);
+      }
+      // If only 1 point (rare), still add button
+      if (points.length === 1) {
+        html += `<button class="add-point-btn" onclick="addPoint()">+ Добавить точку</button>`;
+      }
     }
-    h += '</div>';
-
-    // Resize handle
-    h += '<div class="resize-handle" id="resize-handle"></div>';
-
-    // Right: Editor
-    h += '<div class="pane" id="editor-pane">';
-    h += `<div class="pane-header">
-      <span class="dot" style="background:var(--accent-cyan)"></span> Редактор
-      <span id="mod-dot" style="width:7px;height:7px;border-radius:50%;background:var(--accent-yellow);display:${modified?'inline-block':'none'}"></span>
-      <span class="spacer"></span>
-      <button class="btn sm save" onclick="saveCurrentJson()">💾 Сохранить</button>
-      <button class="btn sm" style="border-color:var(--accent-green);color:var(--accent-green)" onclick="toggleVerify()">
-        ${pair?.verified ? '✓ Verified' : 'Verify'}
-      </button>
-      <button class="btn sm danger" onclick="deletePair('${activePairId}')">🗑</button>
-    </div>`;
-
-    // Editor tabs — data-tab attribute for switchTab
-    h += `<div class="editor-tabs">
-      <button class="editor-tab ${editorTab==='form'?'active':''}" data-tab="form" onclick="switchTab('form')">Form Editor</button>
-      <button class="editor-tab ${editorTab==='json'?'active':''}" data-tab="json" onclick="switchTab('json')">JSON Raw</button>
-    </div>`;
-
-    h += '<div class="editor-body" id="editor-body"></div>';
-    h += '</div>'; // editor-pane
-    h += '</div>'; // workspace
+    html += `</div>`;
   }
-  h += '</div>'; // main-area
 
-  // ---- Upload Modal ----
-  if (showModal) {
-    const matches = getMatches();
-    const matchedCount = matches.filter(m => m.matched).length;
+  // ── Legacy / aggregated fields (для GT всегда заполнены) ──
+  html += `<div class="form-section">
+    <h4>Агрегированные поля</h4>
+    <p class="section-explainer">
 
-    h += `<div class="modal-overlay" onclick="if(event.target===this){showModal=false;render()}">
-      <div class="modal">
-        <h2>Загрузить файлы</h2>
-        <p class="subtitle">Загрузите документы и JSON файлы. Пары создаются по совпадению имён (например order_1.pdf + order_1.json)</p>
+    </p>
+    ${formField('fromAddress', j.fromAddress, 'text', 'обычно = address первой точки')}
+    ${formField('toAddress', j.toAddress, 'text', 'обычно = address последней точки')}
+    <div class="form-row">
+      <label>pickupDate / time</label>
+      <div class="field-pair">
+        ${rawInput('pickupDate', j.pickupDate, 'text', 'YYYY-MM-DD')}
+        ${rawInput('pickupTime', j.pickupTime, 'text', 'HH:MM')}
+      </div>
+    </div>
+    <div class="form-row">
+      <label>deliveryDate / time</label>
+      <div class="field-pair">
+        ${rawInput('deliveryDate', j.deliveryDate, 'text', 'YYYY-MM-DD')}
+        ${rawInput('deliveryTime', j.deliveryTime, 'text', 'HH:MM')}
+      </div>
+    </div>
+    ${formField('contacts', j.contacts, 'textarea', 'агрегированные контакты')}
+    ${formField('comments', j.comments, 'textarea', 'комментарии заявки: ст. отправления ЖД, плательщик и т.п.')}
+  </div>`;
 
-        <div class="upload-zone" onclick="document.getElementById('input-docs').click()"
-             ondragover="event.preventDefault();this.classList.add('dragover')"
-             ondragleave="this.classList.remove('dragover')"
-             ondrop="event.preventDefault();this.classList.remove('dragover');handleDropDocs(event)">
-          <div style="font-size:24px">📄</div>
-          <div class="label">Документы (PDF, DOC, DOCX, TXT) — можно несколько</div>
-          ${uploadDocs.length ? `<div class="filename">${uploadDocs.length} файл(ов): ${uploadDocs.map(f=>f.name).join(', ')}</div>` : ''}
-          <input type="file" id="input-docs" multiple accept=".pdf,.doc,.docx,.txt"
-            onchange="uploadDocs=Array.from(this.files);render()">
+  // ── Footer summary ──
+  const nP = isComplex ? points.length : ((j.from ? 1 : 0) + (j.to ? 1 : 0) || 2);
+  const nC = isComplex
+    ? countUniqueContainers(points.flatMap(p => Array.isArray(p.containers) ? p.containers : []))
+    : containers.length;
+  html += `<div class="form-footer">
+    <div class="summary"><strong>${nP}</strong> ${pluralRu(nP, 'точка', 'точки', 'точек')}
+      &middot; <strong>${nC}</strong> ${pluralRu(nC, 'контейнер', 'контейнера', 'контейнеров')}</div>
+  </div>`;
+
+  body.innerHTML = html;
+  attachFormListeners();
+}
+
+// "Simple-mode" point card (no type select; binds directly to top-level fields:
+//   А card → j.from + j.pickupDate/Time
+//   Б card → j.to   + j.deliveryDate/Time
+function renderSimplePointCard(label, heading, side, pt, accent) {
+  // side === 'from' → пишем в j.from / j.pickupDate / j.pickupTime
+  // side === 'to'   → пишем в j.to   / j.deliveryDate / j.deliveryTime
+  const addrPath = side;
+  const datePath = side === 'from' ? 'pickupDate' : 'deliveryDate';
+  const timePath = side === 'from' ? 'pickupTime' : 'deliveryTime';
+  return `<div class="point-card endpoint">
+    <div class="point-card-header">
+      <div class="point-label-badge ${accent}">${escapeHtml(label)}</div>
+      <div class="point-title-block">
+        <div class="point-card-title">${escapeHtml(heading)}</div>
+        <div class="point-card-subtitle">simple-mode</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <label title="адрес как в документе">address</label>
+      ${rawInput(addrPath, pt.address, 'text', 'адрес как в документе')}
+    </div>
+    <div class="form-row">
+      <label>Дата / Время</label>
+      <div class="field-pair">
+        ${rawInput(datePath, pt.date, 'text', 'YYYY-MM-DD')}
+        ${rawInput(timePath, pt.time, 'text', 'HH:MM')}
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderComplexPointCard(pt, idx, total) {
+  const path = `points.${idx}`;
+  const tp = pt.type || 'other';
+  const containers = Array.isArray(pt.containers) ? pt.containers : [];
+  let accent = 'mid';
+  if (idx === 0) accent = 'start';
+  else if (idx === total - 1) accent = 'end';
+  const heading = idx === 0 ? 'Начало маршрута'
+                 : idx === total - 1 ? 'Конец маршрута'
+                 : `Промежуточная точка ${idx}`;
+  return `<div class="point-card ${accent === 'mid' ? '' : 'endpoint'}">
+    <div class="point-card-header">
+      <div class="point-label-badge ${accent}">${escapeHtml(pt.label || (idx + 1))}</div>
+      <div class="point-title-block">
+        <div class="point-card-title">${escapeHtml(heading)}</div>
+        <div class="point-card-subtitle">тип: ${escapeHtml(tp)}</div>
+      </div>
+      <div class="point-actions">
+        ${idx > 0 && idx < total-1 ? `<button class="btn-ghost btn-sm" onclick="movePoint(${idx},-1)" title="Вверх">Up</button>` : ''}
+        ${idx > 0 && idx < total-1 ? `<button class="btn-ghost btn-sm" onclick="movePoint(${idx},1)" title="Вниз">Down</button>` : ''}
+        ${total > 2 && idx > 0 && idx < total-1 ? `<button class="btn-danger btn-sm" onclick="removePoint(${idx})">Удалить</button>` : ''}
+      </div>
+    </div>
+    ${formField('type', pt.type, 'select', null, path, _enums.pointType)}
+    ${formField('address', pt.address, 'text', 'адрес как в документе', path, null, true)}
+    <div class="form-row">
+      <label>Дата / Время</label>
+      <div class="field-pair">
+        ${rawInput(`${path}.date`, pt.date, 'text', 'YYYY-MM-DD')}
+        ${rawInput(`${path}.time`, pt.time, 'text', 'HH:MM')}
+      </div>
+    </div>
+    ${formField('contacts', pt.contacts, 'textarea', 'контакты на этой точке', path)}
+    ${formField('comment', pt.comment, 'textarea', 'комментарий к этой точке', path)}
+    <div class="ctr-section">
+      <div class="ctr-section-header">
+        Контейнеры на точке <span class="count">${containers.length}</span>
+      </div>
+      ${containers.map((c, ci) => renderContainerCardV2(c, `${path}.containers.${ci}`, ci, idx, true)).join('')}
+      <button class="add-ctr-btn" onclick="addContainerToPoint(${idx})">+ Добавить контейнер</button>
+    </div>
+  </div>`;
+}
+
+// v2-style container card with summary line + Безномерной toggle
+function renderContainerCardV2(c, path, ci, pointIdx, compact) {
+  const num = c.containerNumber;
+  const isUnnum = c.isUnnumbered === true;
+  const summary = buildContainerSummary(c);
+  return `<div class="container-card ${compact ? 'compact' : ''}">
+    <div class="ctr-card-header">
+      <div class="ctr-card-title-block">
+        <div class="ctr-card-title">
+          Контейнер ${ci + 1}
+          ${isUnnum ? '<span style="font-size:10px;background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:3px;margin-left:6px">безномерной</span>' : ''}
         </div>
-
-        <div class="upload-zone" onclick="document.getElementById('input-jsons').click()"
-             ondragover="event.preventDefault();this.classList.add('dragover')"
-             ondragleave="this.classList.remove('dragover')"
-             ondrop="event.preventDefault();this.classList.remove('dragover');handleDropJsons(event)">
-          <div style="font-size:24px">{ }</div>
-          <div class="label">JSON файлы — можно несколько</div>
-          ${uploadJsons.length ? `<div class="filename">${uploadJsons.length} файл(ов): ${uploadJsons.map(f=>f.name).join(', ')}</div>` : ''}
-          <input type="file" id="input-jsons" multiple accept=".json"
-            onchange="uploadJsons=Array.from(this.files);render()">
-        </div>`;
-
-    // Match preview table
-    if (matches.length) {
-      h += `<div class="match-preview">
-        <div style="font-size:12px;color:var(--text-secondary)">
-          Сопоставление: <strong style="color:var(--accent-green)">${matchedCount} пар</strong>
-          ${matches.length - matchedCount ? ` / <span style="color:var(--accent-red)">${matches.length - matchedCount} без пары</span>` : ''}
-        </div>
-        <table><tr><th>Имя</th><th>Документ</th><th>JSON</th></tr>`;
-      matches.forEach(m => {
-        h += `<tr>
-          <td>${esc(m.stem)}</td>
-          <td class="${m.doc?'matched':'unmatched'}">${m.doc ? esc(m.doc) : '—'}</td>
-          <td class="${m.json?'matched':'unmatched'}">${m.json ? esc(m.json) : '—'}</td>
-        </tr>`;
-      });
-      h += '</table></div>';
-    }
-
-    h += `<div class="modal-actions">
-        <button class="btn" onclick="showModal=false;uploadDocs=[];uploadJsons=[];render()">Отмена</button>
-        <button class="btn primary" onclick="doBatchUpload()" ${(!matchedCount||uploading)?'disabled':''}>
-          ${uploading ? 'Загрузка…' : `Загрузить ${matchedCount} пар`}
-        </button>
-      </div></div></div>`;
-  }
-
-  document.getElementById('app').innerHTML = h;
-
-  // Post-render
-  if (activePairId && jsonData) {
-    renderEditorBody();
-    if (previewType === 'txt') loadTextPreview();
-    setupResize();
-  }
+        ${summary ? `<div class="ctr-card-summary">${escapeHtml(summary)}</div>` : ''}
+      </div>
+      <button class="btn-danger btn-sm" onclick="removeContainer('${path}', ${pointIdx ?? -1}, ${ci})" title="Удалить контейнер">Удалить</button>
+    </div>
+    <div class="form-row">
+      <label>Безномерной</label>
+      <div><div class="switch ${isUnnum ? 'on' : ''}" onclick="toggleCtrUnnumbered('${path}')" title="isUnnumbered"></div></div>
+    </div>
+    ${isUnnum
+      ? formField('pinCode', c.pinCode, 'text', '0796', path)
+      : formField('containerNumber', c.containerNumber, 'text', 'ABCD1234567 (ISO 6346)', path)}
+    <div class="form-row">
+      <label>Тип / Размер</label>
+      <div class="field-pair">
+        ${rawSelect(`${path}.containerType`, c.containerType, _enums.containerType)}
+        ${rawSelect(`${path}.containerSize`, c.containerSize, _enums.containerSize)}
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Статус / Вес, кг</label>
+      <div class="field-pair">
+        ${rawSelect(`${path}.status`, c.status, _enums.containerStatus)}
+        ${rawInput(`${path}.cargoWeight`, c.cargoWeight, 'number', 'кг')}
+      </div>
+    </div>
+    ${formField('comment', c.comment, 'textarea', 'комментарий к контейнеру', path)}
+  </div>`;
 }
 
-// ---- Drag-drop helpers ----
-function handleDropDocs(e) {
-  const files = Array.from(e.dataTransfer.files).filter(f => isDoc(f.name));
-  if (files.length) { uploadDocs = [...uploadDocs, ...files]; render(); }
-}
-function handleDropJsons(e) {
-  const files = Array.from(e.dataTransfer.files).filter(f => isJson(f.name));
-  if (files.length) { uploadJsons = [...uploadJsons, ...files]; render(); }
-}
-
-// ---- Text preview ----
-async function loadTextPreview() {
-  if (!activePairId) return;
-  try {
-    const r = await fetch(api.docUrl(activePairId));
-    const text = await r.text();
-    const el = document.getElementById('preview-text');
-    if (el) el.textContent = text;
-  } catch {}
+function buildContainerSummary(c) {
+  const parts = [];
+  if (c.isUnnumbered) parts.push(`PIN: ${c.pinCode || '—'}`);
+  else if (c.containerNumber) parts.push(c.containerNumber);
+  if (c.containerSize) parts.push(c.containerSize);
+  if (c.containerType) parts.push(c.containerType);
+  if (c.status === 'loaded') parts.push('Гружёный');
+  else if (c.status === 'empty') parts.push('Порожний');
+  return parts.join(' · ');
 }
 
-// ---- Resize handle ----
-function setupResize() {
-  const handle = document.getElementById('resize-handle');
-  const preview = document.getElementById('preview-pane');
-  if (!handle || !preview) return;
-  let startX, startW;
-  handle.onmousedown = (e) => {
-    e.preventDefault();
-    startX = e.clientX;
-    startW = preview.getBoundingClientRect().width;
-    handle.classList.add('active');
-    const onMove = (ev) => {
-      const w = Math.max(200, Math.min(startW + ev.clientX - startX, window.innerWidth - 380));
-      preview.style.flex = 'none';
-      preview.style.width = w + 'px';
+function ensureSimplePoint(side) {
+  // simple-mode: 'from'/'to' хранятся как строки в j.from/j.to (адрес).
+  // Расширенные поля (date/time/contacts/comment) — в legacy полях
+  // pickupDate/Time + comments. Для удобства собираем "виртуальную" точку
+  // из существующих полей (адрес из j.from/j.to, даты из legacy).
+  const j = _currentJson;
+  if (side === 'from') {
+    return {
+      address: j.from || j.fromAddress || '',
+      date: j.pickupDate || null,
+      time: j.pickupTime || null,
+      contacts: j.contacts || null,
+      comment: j.comments || null,
     };
-    const onUp = () => {
-      handle.classList.remove('active');
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+  }
+  return {
+    address: j.to || j.toAddress || '',
+    date: j.deliveryDate || null,
+    time: j.deliveryTime || null,
+    contacts: null,
+    comment: null,
   };
 }
 
-// ---- Keyboard ----
-document.addEventListener('keydown', e => {
-  if ((e.ctrlKey||e.metaKey) && e.key === 's') { e.preventDefault(); saveCurrentJson(); }
+function pluralRu(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20)) return few;
+  return many;
+}
+
+function countUniqueContainers(list) {
+  const seen = new Set();
+  let synth = 0;
+  for (const c of (list || [])) {
+    const k = (c.containerNumber || '').replace(/\s+/g,'').toUpperCase()
+      || (c.pinCode ? `pin:${c.pinCode}` : `synth:${synth++}`);
+    seen.add(k);
+  }
+  return seen.size || (list || []).length;
+}
+
+// Bare input/select helpers — used inside form-row "field-pair" (no label wrap)
+function rawInput(path, val, type, hint) {
+  const isNull = val === null || val === undefined;
+  const safeVal = isNull ? '' : val;
+  if (type === 'number') {
+    return `<input type="number" data-path="${path}" data-type="number"
+      value="${isNull ? '' : escapeHtml(String(safeVal))}" placeholder="${escapeHtml(hint||'')}">`;
+  }
+  return `<input type="text" data-path="${path}" data-type="text"
+      value="${escapeHtml(safeVal)}"
+      ${isNull ? 'class="input-null" placeholder="' + escapeHtml(hint||'null') + '"' :
+                 'placeholder="' + escapeHtml(hint||'') + '"'}>`;
+}
+function rawSelect(path, val, options) {
+  const isNull = val === null || val === undefined;
+  const opts = ['', ...options];
+  return `<select data-path="${path}" data-type="select">${opts.map(o => {
+    const lbl = o === '' ? '— null —' : o;
+    const cur = isNull ? '' : val;
+    return `<option value="${o}" ${cur === o ? 'selected' : ''}>${lbl}</option>`;
+  }).join('')}</select>`;
+}
+
+// Toggle isComplexRoute via the switch row at top
+function toggleComplex() {
+  if (!_currentJson) return;
+  _currentJson.isComplexRoute = !(_currentJson.isComplexRoute === true);
+  // In complex-mode top-level containers should be null, in simple — array.
+  if (_currentJson.isComplexRoute) {
+    if (!Array.isArray(_currentJson.points) || !_currentJson.points.length) {
+      _currentJson.points = [
+        { order:1, label:'A', type:'pickup_loaded', address:'', date:null, time:null, contacts:null, comment:null, containers:[] },
+        { order:2, label:'B', type:'dropoff_loaded', address:'', date:null, time:null, contacts:null, comment:null, containers:[] },
+      ];
+    }
+    _currentJson.containers = null;
+    _currentJson.from = null; _currentJson.to = null;
+  } else {
+    if (!Array.isArray(_currentJson.containers) || !_currentJson.containers.length) {
+      _currentJson.containers = [];
+    }
+    _currentJson.points = null;
+  }
+  markDirty(); renderForm();
+}
+
+function toggleCtrUnnumbered(path) {
+  // path = "containers.0" or "points.N.containers.M"
+  const c = getByPath(_currentJson, path);
+  if (!c) return;
+  const next = !(c.isUnnumbered === true);
+  c.isUnnumbered = next;
+  if (next) c.containerNumber = null;
+  else c.pinCode = null;
+  markDirty(); renderForm();
+}
+
+function getByPath(obj, path) {
+  const parts = path.split('.');
+  let cur = obj;
+  for (const k of parts) {
+    if (cur == null) return undefined;
+    cur = Array.isArray(cur) ? cur[parseInt(k,10)] : cur[k];
+  }
+  return cur;
+}
+
+function formField(key, val, type, hint, path, options) {
+  const fullPath = path ? `${path}.${key}` : key;
+  const isNull = val === null || val === undefined;
+  const safeVal = val === null || val === undefined ? '' : val;
+  let input;
+  if (type === 'bool') {
+    const opts = ['null', 'true', 'false'];
+    input = `<select data-path="${fullPath}" data-type="bool">${opts.map(o => {
+      const cur = isNull ? 'null' : (val ? 'true' : 'false');
+      return `<option value="${o}" ${cur === o ? 'selected' : ''}>${o}</option>`;
+    }).join('')}</select>`;
+  } else if (type === 'select') {
+    const opts = ['', ...options];
+    input = `<select data-path="${fullPath}" data-type="select">${opts.map(o => {
+      const lbl = o === '' ? 'null' : o;
+      const cur = isNull ? '' : val;
+      return `<option value="${o}" ${cur === o ? 'selected' : ''}>${lbl}</option>`;
+    }).join('')}</select>`;
+  } else if (type === 'textarea') {
+    input = `<textarea data-path="${fullPath}" data-type="text" rows="2"
+              ${isNull ? 'class="input-null" placeholder="null"' : ''}>${escapeHtml(safeVal)}</textarea>`;
+  } else if (type === 'number' || type === 'int') {
+    input = `<input type="number" data-path="${fullPath}" data-type="${type}"
+              value="${isNull ? '' : escapeHtml(String(safeVal))}"
+              placeholder="${hint || 'null'}">`;
+  } else {
+    input = `<input type="text" data-path="${fullPath}" data-type="text"
+              value="${escapeHtml(safeVal)}"
+              ${isNull ? 'class="input-null" placeholder="null"' : `placeholder="${escapeHtml(hint||'')}"`}>`;
+  }
+  return `<div class="form-row"><label title="${escapeHtml(hint||'')}">${key}</label>${input}</div>`;
+}
+
+function attachFormListeners() {
+  document.querySelectorAll('#form-body [data-path]').forEach(el => {
+    el.addEventListener('change', onFormFieldChange);
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+      el.addEventListener('input', onFormFieldChange);
+    }
+  });
+}
+
+function onFormFieldChange(e) {
+  const el = e.target;
+  const path = el.dataset.path;
+  const type = el.dataset.type;
+  let v = el.value;
+  if (type === 'bool') {
+    v = v === 'null' ? null : (v === 'true');
+  } else if (type === 'select') {
+    v = v === '' ? null : v;
+  } else if (type === 'number') {
+    v = v === '' ? null : parseFloat(v);
+  } else if (type === 'int') {
+    v = v === '' ? null : parseInt(v, 10);
+  } else {
+    v = v === '' ? null : v;
+  }
+  setByPath(_currentJson, path, v);
+  // Синхронизация Raw-textarea: чтобы JSON Raw всегда отражал текущее состояние формы.
+  const ta = document.getElementById('json-text');
+  if (ta) ta.value = JSON.stringify(_currentJson, null, 2);
+  setStatus(isDirty() ? 'dirty' : 'clean', isDirty() ? 'не сохранено' : 'сохранено');
+}
+
+function setByPath(obj, path, val) {
+  const parts = path.split('.');
+  let cur = obj;
+  for (let i = 0; i < parts.length - 1; i++) {
+    const k = parts[i];
+    if (Array.isArray(cur)) cur = cur[parseInt(k,10)];
+    else cur = cur[k];
+    if (cur === null || cur === undefined) return;
+  }
+  const last = parts[parts.length-1];
+  if (Array.isArray(cur)) cur[parseInt(last,10)] = val;
+  else cur[last] = val;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Form actions: add/remove/move points and containers
+// ═══════════════════════════════════════════════════════════════════════
+async function addPoint() {
+  const tpl = await api('/api/schema/template/point');
+  const pts = (_currentJson.points = _currentJson.points || []);
+  const order = pts.length + 1;
+  const last = pts.length;
+  const newPt = {...tpl, order, label: pts.length ? String(pts.length) : 'A'};
+  // Insert before final point if there are ≥2; else append.
+  if (pts.length >= 2) {
+    pts.splice(pts.length - 1, 0, newPt);
+  } else {
+    pts.push(newPt);
+  }
+  _currentJson.isComplexRoute = true;
+  reLabelPoints();
+  markDirty(); renderForm();
+}
+
+function reLabelPoints() {
+  const pts = _currentJson.points || [];
+  pts.forEach((p, i) => {
+    p.order = i + 1;
+    if (i === 0) p.label = 'A';
+    else if (i === pts.length - 1) p.label = 'B';
+    else p.label = String(i);
+  });
+}
+
+function removePoint(idx) {
+  if (!confirm('Удалить точку?')) return;
+  _currentJson.points.splice(idx, 1);
+  reLabelPoints();
+  markDirty(); renderForm();
+}
+
+function movePoint(idx, dir) {
+  const pts = _currentJson.points;
+  const tgt = idx + dir;
+  if (tgt < 0 || tgt >= pts.length) return;
+  [pts[idx], pts[tgt]] = [pts[tgt], pts[idx]];
+  reLabelPoints();
+  markDirty(); renderForm();
+}
+
+async function addContainerToPoint(pointIdx) {
+  const tpl = await api('/api/schema/template/container');
+  const pt = _currentJson.points[pointIdx];
+  pt.containers = pt.containers || [];
+  pt.containers.push({...tpl});
+  markDirty(); renderForm();
+}
+
+async function addContainerSimple() {
+  const tpl = await api('/api/schema/template/container');
+  _currentJson.containers = _currentJson.containers || [];
+  _currentJson.containers.push({...tpl});
+  markDirty(); renderForm();
+}
+
+function removeContainer(path, pointIdx, ci) {
+  if (!confirm('Удалить контейнер?')) return;
+  if (pointIdx >= 0) {
+    _currentJson.points[pointIdx].containers.splice(ci, 1);
+  } else {
+    _currentJson.containers.splice(ci, 1);
+  }
+  markDirty(); renderForm();
+}
+
+async function insertTemplate(kind) {
+  if (isDirty() && !confirm('Текущие данные будут заменены. Продолжить?')) return;
+  const tpl = await api(`/api/schema/template/${kind}`);
+  _currentJson = JSON.parse(JSON.stringify(tpl));
+  document.getElementById('json-text').value = JSON.stringify(_currentJson, null, 2);
+  renderForm();
+  markDirty();
+  showToast(`Шаблон ${kind} вставлен`, 'success');
+}
+
+function markDirty() {
+  setStatus('dirty', 'не сохранено');
+  // Держим JSON Raw синхронизированным с текущим состоянием формы.
+  const ta = document.getElementById('json-text');
+  if (ta && _currentJson) ta.value = JSON.stringify(_currentJson, null, 2);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Save / verify
+// ═══════════════════════════════════════════════════════════════════════
+function isDirty() {
+  if (!_currentJson || !_lastSaved) return false;
+  return JSON.stringify(_currentJson) !== _lastSaved;
+}
+
+let _statusTimer = null;
+function setStatus(state, text) {
+  // Один статус — наверху панели редактора, исчезает через ~1.6s.
+  const s = document.getElementById('json-status');
+  if (!s) return;
+  s.className = 'json-status visible ' + state;
+  s.textContent = text;
+  if (_statusTimer) clearTimeout(_statusTimer);
+  // 'dirty' / 'invalid' держим, остальное прячем.
+  if (state !== 'dirty' && state !== 'invalid') {
+    _statusTimer = setTimeout(() => {
+      s.classList.remove('visible');
+    }, 1600);
+  }
+}
+
+async function saveJson() {
+  if (!_currentId) return;
+  // If raw mode is open, flush textarea → _currentJson first.
+  if (_jsonTab === 'raw') {
+    const txt = document.getElementById('json-text').value;
+    try { _currentJson = JSON.parse(txt); }
+    catch(e) { showToast('Невалидный JSON: ' + e.message, 'error'); return; }
+  }
+  try {
+    const payload = wrapEnvelope(_currentJson);
+    await api(`/api/pairs/${_currentId}/json`, {method: 'PUT', body: payload});
+    _lastSaved = JSON.stringify(_currentJson);
+    setStatus('clean', 'сохранено');
+    showToast('Сохранено', 'success');
+  } catch(e) { showToast('Ошибка сохранения: ' + e.message, 'error'); }
+}
+
+async function toggleVerified() {
+  if (!_currentId) return;
+  if (isDirty() && !confirm('Сохранить изменения перед verify?')) return;
+  if (isDirty()) await saveJson();
+  try {
+    const r = await api(`/api/pairs/${_currentId}/verify`, {method: 'PATCH'});
+    const p = _pairs.find(x => x.id === _currentId);
+    if (p) p.verified = r.verified;
+    updateVerifyButton(r.verified);
+    renderPairList();
+    renderProgress();
+    showToast(r.verified ? 'Помечено как verified' : 'Снят флаг verified', 'success');
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
+
+function updateVerifyButton(verified) {
+  const b = document.getElementById('verify-btn');
+  if (verified) {
+    b.textContent = 'Verified';
+    b.className = 'btn-success btn-sm';
+  } else {
+    b.textContent = 'Подтвердить';
+    b.className = 'btn-primary btn-sm';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Schema validation (Stage 2)
+// ═══════════════════════════════════════════════════════════════════════
+function validateSchema() {
+  if (!_currentJson) return;
+  const issues = [];
+  const j = _currentJson;
+  const isComplex = j.isComplexRoute === true;
+
+  if (j.isComplexRoute === undefined) issues.push({lvl:'warn', msg:'isComplexRoute не задан'});
+  if (isComplex && !Array.isArray(j.points)) issues.push({lvl:'err', msg:'isComplexRoute=true, но points отсутствует'});
+  if (isComplex && (j.from || j.to)) issues.push({lvl:'warn', msg:'В complex-mode from/to должны быть null'});
+  if (isComplex && j.containers !== null) issues.push({lvl:'warn', msg:'В complex-mode top-level containers должны быть null'});
+  if (!isComplex && (!Array.isArray(j.containers) || !j.containers.length))
+    issues.push({lvl:'err', msg:'simple-mode: containers должен быть непустым массивом'});
+
+  // Per-point checks
+  (j.points || []).forEach((pt, i) => {
+    if (!pt.address) issues.push({lvl:'err', msg:`Точка ${i+1}: address пустой`});
+    if (!pt.type || !_enums.pointType.includes(pt.type))
+      issues.push({lvl:'err', msg:`Точка ${i+1}: тип «${pt.type}» не из ${_enums.pointType.join('/')}`});
+    if (pt.order !== i+1) issues.push({lvl:'warn', msg:`Точка ${i+1}: order=${pt.order} не совпадает с индексом`});
+    (pt.containers || []).forEach((c, ci) => {
+      const ctxName = `Точка ${i+1}, контейнер ${ci+1}`;
+      if (c.containerType && !_enums.containerType.includes(c.containerType))
+        issues.push({lvl:'err', msg:`${ctxName}: containerType=«${c.containerType}» вне ${_enums.containerType.join('/')}`});
+      if (c.containerSize && !_enums.containerSize.includes(c.containerSize))
+        issues.push({lvl:'err', msg:`${ctxName}: containerSize=«${c.containerSize}» вне ${_enums.containerSize.join('/')}`});
+      if (c.status && !_enums.containerStatus.includes(c.status))
+        issues.push({lvl:'err', msg:`${ctxName}: status=«${c.status}» вне ${_enums.containerStatus.join('/')}`});
+      if (c.containerNumber && !c.isUnnumbered) {
+        if (!/^[A-Z]{4}\s?\d{7}$/.test(c.containerNumber))
+          issues.push({lvl:'warn', msg:`${ctxName}: containerNumber «${c.containerNumber}» не похож на ISO 6346`});
+      }
+      if (c.isUnnumbered && c.containerNumber)
+        issues.push({lvl:'warn', msg:`${ctxName}: isUnnumbered=true, но containerNumber заполнен`});
+    });
+  });
+
+  if (j.fromAddress && j.points && j.points[0] && j.fromAddress !== j.points[0].address)
+    issues.push({lvl:'warn', msg:`fromAddress ≠ адресу первой точки`});
+  if (j.toAddress && j.points && j.points.length && j.toAddress !== j.points[j.points.length-1].address)
+    issues.push({lvl:'warn', msg:`toAddress ≠ адресу последней точки`});
+
+  // Render
+  const body = document.getElementById('validate-body');
+  if (!issues.length) {
+    body.innerHTML = `<div style="text-align:center;padding:30px 10px;color:#2e7d32;font-size:14px">
+      Шейп Stage 2 — валидный, проблем не найдено.</div>`;
+  } else {
+    const errs = issues.filter(i => i.lvl === 'err');
+    const warns = issues.filter(i => i.lvl === 'warn');
+    body.innerHTML = `
+      <p style="font-size:13px;color:#555;margin-bottom:12px">
+        Ошибок: <strong style="color:#c62828">${errs.length}</strong>, предупреждений: <strong style="color:#e65100">${warns.length}</strong>
+      </p>
+      <ul style="list-style:none;padding:0;margin:0">
+        ${issues.map(i => `<li style="padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px;display:flex;gap:8px;align-items:flex-start">
+          <span style="flex-shrink:0;display:inline-block;min-width:60px;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:600;text-align:center;
+                       background:${i.lvl==='err'?'#ffebee':'#fff3e0'};color:${i.lvl==='err'?'#c62828':'#e65100'}">
+            ${i.lvl==='err'?'ERROR':'WARN'}
+          </span>
+          <span>${escapeHtml(i.msg)}</span>
+        </li>`).join('')}
+      </ul>`;
+  }
+  document.getElementById('validate-modal').classList.add('open');
+}
+function closeValidateModal() {
+  document.getElementById('validate-modal').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Upload modal
+// ═══════════════════════════════════════════════════════════════════════
+function openUploadModal() {
+  document.getElementById('upload-modal').classList.add('open');
+  document.getElementById('upload-results').innerHTML = '';
+}
+function closeUploadModal() {
+  document.getElementById('upload-modal').classList.remove('open');
+}
+
+async function handleUpload(files) {
+  if (!files || !files.length) return;
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+  const res = document.getElementById('upload-results');
+  res.innerHTML = '<div style="color:#1a73e8">Загрузка...</div>';
+  try {
+    const r = await fetch('/api/pairs/batch', {method: 'POST', body: fd});
+    if (!r.ok) {
+      let detail = (await r.json().catch(()=>({}))).detail || r.statusText;
+      throw new Error(detail);
+    }
+    const data = await r.json();
+    let html = `<div class="ok">Создано пар: <strong>${data.created.length}</strong></div>`;
+    if (data.errors && data.errors.length) {
+      html += `<div class="err">Ошибки: ${data.errors.length}</div>`;
+      html += '<ul style="font-size:11px;color:#c62828;margin:6px 0 6px 20px">';
+      for (const e of data.errors) html += `<li>${escapeHtml(e.file)}: ${escapeHtml(e.error)}</li>`;
+      html += '</ul>';
+    }
+    if (data.unmatched_documents && data.unmatched_documents.length) {
+      html += `<div class="warn">Документы без пары: ${data.unmatched_documents.map(escapeHtml).join(', ')}</div>`;
+    }
+    if (data.unmatched_jsons && data.unmatched_jsons.length) {
+      html += `<div class="warn">JSON без пары: ${data.unmatched_jsons.map(escapeHtml).join(', ')}</div>`;
+    }
+    res.innerHTML = html;
+    await loadPairs();
+  } catch(e) {
+    res.innerHTML = `<div class="err">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+// Drag-and-drop
+const uz = document.getElementById('upload-zone');
+uz.addEventListener('dragover', e => { e.preventDefault(); uz.classList.add('drag'); });
+uz.addEventListener('dragleave', () => uz.classList.remove('drag'));
+uz.addEventListener('drop', e => {
+  e.preventDefault();
+  uz.classList.remove('drag');
+  handleUpload(e.dataTransfer.files);
 });
 
-// ---- Init ----
-loadPairs();
+async function confirmDeleteAll() {
+  if (!_pairs.length) { showToast('Список пуст', 'info'); return; }
+  if (!confirm(`Удалить ВСЕ ${_pairs.length} пар? Это действие необратимо.`)) return;
+  try {
+    await api('/api/pairs', {method: 'DELETE'});
+    _currentId = null;
+    showEmptyState();
+    await loadPairs();
+    showToast('Очищено', 'success');
+  } catch(e) { showToast('Ошибка: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Sidebar toggle
+// ═══════════════════════════════════════════════════════════════════════
+function toggleSidebar() {
+  const m = document.getElementById('main-area');
+  const btn = document.getElementById('sidebar-toggle-btn');
+  m.classList.toggle('collapsed-sidebar');
+  // Кнопка-переключатель остаётся видимой всегда; меняется только подсказка.
+  if (m.classList.contains('collapsed-sidebar')) {
+    btn.title = 'Показать список пар';
+  } else {
+    btn.title = 'Скрыть список пар';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Keyboard shortcuts
+// ═══════════════════════════════════════════════════════════════════════
+document.addEventListener('keydown', (e) => {
+  // Ctrl+S → save
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    if (_currentId) saveJson();
+    return;
+  }
+  // Alt+↑ / Alt+↓ → previous/next pair
+  if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    const ids = _pairs.map(p => p.id);
+    const i = ids.indexOf(_currentId);
+    const nextIdx = e.key === 'ArrowDown'
+      ? Math.min(ids.length-1, i + 1)
+      : Math.max(0, i - 1);
+    if (ids[nextIdx] && ids[nextIdx] !== _currentId) selectPair(ids[nextIdx]);
+  }
+  // Esc → close modals
+  if (e.key === 'Escape') {
+    closeUploadModal();
+    closeValidateModal();
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════
+// Bootstrap
+// ═══════════════════════════════════════════════════════════════════════
+async function init() {
+  document.getElementById('json-text').addEventListener('input', onRawInput);
+  // Try to load enum values from server (graceful fallback if endpoint absent).
+  try {
+    const e = await api('/api/schema/enums');
+    _enums = e;
+  } catch(err) { /* keep defaults */ }
+  await loadPairs();
+}
+init();
 </script>
 </body>
 </html>

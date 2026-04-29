@@ -45,15 +45,18 @@ def _convert_docx_to_html(docx_path: Path) -> str:
     """Convert DOCX to HTML using mammoth (pure Python, no LibreOffice)."""
     with open(docx_path, "rb") as f:
         result = mammoth.convert_to_html(f)
+    # Light theme matching the rest of the editor.
     css = """
     <style>
-      body { font-family: 'Segoe UI', Arial, sans-serif; padding: 24px;
-             max-width: 800px; margin: 0 auto; line-height: 1.6;
-             color: #e0e0e0; background: #1a1a2e; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+             padding: 24px; max-width: 820px; margin: 0 auto; line-height: 1.55;
+             color: #333; background: #fff; font-size: 14px; }
       table { border-collapse: collapse; width: 100%; margin: 12px 0; }
-      td, th { border: 1px solid #333; padding: 8px; }
-      img { max-width: 100%; }
+      td, th { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+      th { background: #f9f9f9; font-weight: 600; color: #555; }
+      img { max-width: 100%; height: auto; }
       p { margin: 8px 0; }
+      h1, h2, h3 { color: #1a1a2e; margin: 16px 0 8px; }
     </style>
     """
     return f"<!DOCTYPE html><html><head><meta charset='utf-8'>{css}</head><body>{result.value}</body></html>"
@@ -366,3 +369,97 @@ async def delete_pair(pair_id: str):
         raise HTTPException(404, "Pair not found")
     shutil.rmtree(pair_path)
     return {"status": "deleted", "id": pair_id}
+
+
+# ---- Stage 2 schema templates (used by the SPA quick-insert buttons) ----
+
+_TEMPLATE_CONTAINER = {
+    "containerNumber": None,
+    "containerType": None,
+    "containerSize": None,
+    "isUnnumbered": False,
+    "status": "loaded",
+    "cargoWeight": None,
+    "pinCode": None,
+    "comment": None,
+}
+
+_TEMPLATE_POINT = {
+    "order": 1,
+    "label": "A",
+    "type": "pickup_loaded",
+    "address": "",
+    "date": None,
+    "time": None,
+    "contacts": None,
+    "comment": None,
+    "containers": [_TEMPLATE_CONTAINER],
+}
+
+_TEMPLATE_FULL_COMPLEX = {
+    "isComplexRoute": True,
+    "from": None,
+    "to": None,
+    "containers": None,
+    "points": [
+        {**_TEMPLATE_POINT, "order": 1, "label": "A", "type": "pickup_loaded"},
+        {**_TEMPLATE_POINT, "order": 2, "label": "B", "type": "dropoff_loaded"},
+    ],
+    "fromAddress": None,
+    "toAddress": None,
+    "pickupDate": None,
+    "pickupTime": None,
+    "deliveryDate": None,
+    "deliveryTime": None,
+    "contacts": None,
+    "comments": None,
+}
+
+_TEMPLATE_FULL_SIMPLE = {
+    "isComplexRoute": False,
+    "from": None,
+    "to": None,
+    "containers": [_TEMPLATE_CONTAINER],
+    "points": None,
+    "fromAddress": None,
+    "toAddress": None,
+    "pickupDate": None,
+    "pickupTime": None,
+    "deliveryDate": None,
+    "deliveryTime": None,
+    "contacts": None,
+    "comments": None,
+}
+
+
+@router.get("/schema/template/{kind}")
+async def schema_template(kind: str):
+    """Return blank template for Stage 2 GT shape. kind ∈ {container, point, complex, simple}."""
+    mapping = {
+        "container": _TEMPLATE_CONTAINER,
+        "point": _TEMPLATE_POINT,
+        "complex": _TEMPLATE_FULL_COMPLEX,
+        "simple": _TEMPLATE_FULL_SIMPLE,
+    }
+    if kind not in mapping:
+        raise HTTPException(400, f"Unknown template kind: {kind}")
+    return mapping[kind]
+
+
+@router.get("/schema/enums")
+async def schema_enums():
+    """Allowed values for Stage 2 fields — used to drive Form-mode dropdowns."""
+    return {
+        "pointType": [
+            "pickup_empty",
+            "pickup_loaded",
+            "wash",
+            "load",
+            "dropoff_loaded",
+            "return_empty",
+            "other",
+        ],
+        "containerType": ["HC", "DC", "RF", "OT", "FR"],
+        "containerSize": ["20'", "40'", "40'HC", "45'HC"],
+        "containerStatus": ["loaded", "empty"],
+    }
