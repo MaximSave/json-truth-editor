@@ -46,10 +46,9 @@ UI для разметки эталонных JSON-файлов рядом с и
 
 ## Команды для запуска
 
-### Через Docker Compose (рекомендуемый путь)
+### Через Docker Compose
 
 ```bash
-cd C:\Users\maxim\PycharmProjects\D\json-truth-editor
 docker-compose up --build -d
 ```
 
@@ -73,7 +72,6 @@ docker cp static/index.html json-truth-editor:/app/static/index.html
 ### Локально без Docker (для разработки)
 
 ```bash
-cd C:\Users\maxim\PycharmProjects\D\json-truth-editor
 python -m venv .venv
 .venv\Scripts\activate           # Windows
 # source .venv/bin/activate      # Mac/Linux
