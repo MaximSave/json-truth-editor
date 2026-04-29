@@ -378,7 +378,7 @@ _TEMPLATE_CONTAINER = {
     "containerType": None,
     "containerSize": None,
     "isUnnumbered": False,
-    "status": "loaded",
+    "status": "Гружёный",
     "cargoWeight": None,
     "pinCode": None,
     "comment": None,
@@ -387,7 +387,7 @@ _TEMPLATE_CONTAINER = {
 _TEMPLATE_POINT = {
     "order": 1,
     "label": "A",
-    "type": "pickup_loaded",
+    "type": "Получение",
     "address": "",
     "date": None,
     "time": None,
@@ -402,8 +402,8 @@ _TEMPLATE_FULL_COMPLEX = {
     "to": None,
     "containers": None,
     "points": [
-        {**_TEMPLATE_POINT, "order": 1, "label": "A", "type": "pickup_loaded"},
-        {**_TEMPLATE_POINT, "order": 2, "label": "B", "type": "dropoff_loaded"},
+        {**_TEMPLATE_POINT, "order": 1, "label": "A", "type": "Получение"},
+        {**_TEMPLATE_POINT, "order": 2, "label": "Б", "type": "Выгрузка"},
     ],
     "fromAddress": None,
     "toAddress": None,
@@ -449,17 +449,19 @@ async def schema_template(kind: str):
 @router.get("/schema/enums")
 async def schema_enums():
     """Allowed values for Stage 2 fields — used to drive Form-mode dropdowns."""
+    # Enum по NewTask.pdf §2.1, §7.1.
+    # 6 типов точек (pickup_empty + pickup_loaded свёрнуты в "Получение");
+    # 4 размера (45'HC исключён); статус — "Порожний"/"Гружёный".
     return {
         "pointType": [
-            "pickup_empty",
-            "pickup_loaded",
-            "wash",
-            "load",
-            "dropoff_loaded",
-            "return_empty",
-            "other",
+            "Получение",
+            "Погрузка",
+            "Выгрузка",
+            "Сдача порожнего",
+            "Мойка",
+            "Другое",
         ],
         "containerType": ["HC", "DC", "RF", "OT", "FR"],
-        "containerSize": ["20'", "40'", "40'HC", "45'HC"],
-        "containerStatus": ["loaded", "empty"],
+        "containerSize": ["20'", "40'", "40'HC", "45'"],
+        "containerStatus": ["Порожний", "Гружёный"],
     }

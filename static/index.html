@@ -563,12 +563,53 @@ let _envelopeKey = null;     // имя ключа внутри обёртки, �
 let _lastSaved = null;
 let _jsonTab = 'form';
 let _filter = 'all';
+// Enum по NewTask.pdf §2.1, §7.1.
 let _enums = {
-  pointType: ['pickup_empty','pickup_loaded','wash','load','dropoff_loaded','return_empty','other'],
+  pointType: ['Получение','Погрузка','Выгрузка','Сдача порожнего','Мойка','Другое'],
   containerType: ['HC','DC','RF','OT','FR'],
-  containerSize: ["20'","40'","40'HC","45'HC"],
-  containerStatus: ['loaded','empty'],
+  containerSize: ["20'","40'","40'HC","45'"],
+  containerStatus: ['Порожний','Гружёный'],
 };
+
+// Legacy → NewTask.pdf vocabulary maps (применяются при загрузке JSON,
+// чтобы старые ai-выходы продолжали корректно отображаться в форме).
+const _LEGACY_POINT_TYPE = {
+  'pickup_empty':   'Получение',
+  'pickup_loaded':  'Получение',
+  'load':           'Погрузка',
+  'dropoff_loaded': 'Выгрузка',
+  'return_empty':   'Сдача порожнего',
+  'wash':           'Мойка',
+  'other':          'Другое',
+};
+const _LEGACY_STATUS = {
+  'loaded': 'Гружёный',
+  'empty':  'Порожний',
+};
+const _LEGACY_SIZE = {
+  "45'HC": "45'",
+};
+
+function normalizeLegacyVocabulary(j) {
+  // Конвертация старых внутренних значений в новые пользовательские.
+  // Не валит схему — просто делает значения совместимыми с enum.
+  if (!j || typeof j !== 'object') return j;
+  const fixContainer = (c) => {
+    if (!c || typeof c !== 'object') return;
+    if (c.status && _LEGACY_STATUS[c.status]) c.status = _LEGACY_STATUS[c.status];
+    if (c.containerSize && _LEGACY_SIZE[c.containerSize]) c.containerSize = _LEGACY_SIZE[c.containerSize];
+  };
+  if (Array.isArray(j.points)) {
+    j.points.forEach(p => {
+      if (p && _LEGACY_POINT_TYPE[p.type]) p.type = _LEGACY_POINT_TYPE[p.type];
+      // Б-точку переименовываем по NewTask.pdf (Б вместо латинской B)
+      if (p && p.label === 'B') p.label = 'Б';
+      if (p && Array.isArray(p.containers)) p.containers.forEach(fixContainer);
+    });
+  }
+  if (Array.isArray(j.containers)) j.containers.forEach(fixContainer);
+  return j;
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 // API helpers
@@ -690,7 +731,7 @@ async function selectPair(id) {
     const unwrapped = unwrapEnvelope(data);
     _envelope     = unwrapped.envelope;
     _envelopeKey  = unwrapped.key;
-    _currentJson  = unwrapped.inner;
+    _currentJson  = normalizeLegacyVocabulary(unwrapped.inner);
     _lastSaved    = JSON.stringify(_currentJson);
     setStatus('clean', 'загружено');
     document.getElementById('json-text').value = JSON.stringify(_currentJson, null, 2);
@@ -1012,7 +1053,7 @@ function renderSimplePointCard(label, heading, side, pt, accent) {
 
 function renderComplexPointCard(pt, idx, total) {
   const path = `points.${idx}`;
-  const tp = pt.type || 'other';
+  const tp = pt.type || 'Другое';
   const containers = Array.isArray(pt.containers) ? pt.containers : [];
   let accent = 'mid';
   if (idx === 0) accent = 'start';
@@ -1101,8 +1142,10 @@ function buildContainerSummary(c) {
   else if (c.containerNumber) parts.push(c.containerNumber);
   if (c.containerSize) parts.push(c.containerSize);
   if (c.containerType) parts.push(c.containerType);
-  if (c.status === 'loaded') parts.push('Гружёный');
-  else if (c.status === 'empty') parts.push('Порожний');
+  // Status-summary: новый словарь NewTask.pdf (Порожний/Гружёный) +
+  // обратная совместимость с легаси loaded/empty.
+  if (c.status === 'Гружёный' || c.status === 'loaded') parts.push('Гружёный');
+  else if (c.status === 'Порожний' || c.status === 'empty') parts.push('Порожний');
   return parts.join(' · ');
 }
 
@@ -1179,8 +1222,8 @@ function toggleComplex() {
   if (_currentJson.isComplexRoute) {
     if (!Array.isArray(_currentJson.points) || !_currentJson.points.length) {
       _currentJson.points = [
-        { order:1, label:'A', type:'pickup_loaded', address:'', date:null, time:null, contacts:null, comment:null, containers:[] },
-        { order:2, label:'B', type:'dropoff_loaded', address:'', date:null, time:null, contacts:null, comment:null, containers:[] },
+        { order:1, label:'А', type:'Получение', address:'', date:null, time:null, contacts:null, comment:null, containers:[] },
+        { order:2, label:'Б', type:'Выгрузка',  address:'', date:null, time:null, contacts:null, comment:null, containers:[] },
       ];
     }
     _currentJson.containers = null;
@@ -1300,9 +1343,19 @@ function setByPath(obj, path, val) {
 async function addPoint() {
   const tpl = await api('/api/schema/template/point');
   const pts = (_currentJson.points = _currentJson.points || []);
+  // По NewTask.pdf §3.3: новая точка вставляется перед Точкой Б,
+  // её контейнеры наследуются от предыдущей, тип по умолчанию — "Другое".
   const order = pts.length + 1;
-  const last = pts.length;
-  const newPt = {...tpl, order, label: pts.length ? String(pts.length) : 'A'};
+  const inheritFrom = pts.length >= 1 ? pts[pts.length - 2 >= 0 ? pts.length - 2 : pts.length - 1] : null;
+  const inherited = inheritFrom && Array.isArray(inheritFrom.containers)
+    ? JSON.parse(JSON.stringify(inheritFrom.containers))
+    : [];
+  const newPt = {
+    ...tpl, order,
+    label: pts.length ? String(pts.length) : 'А',
+    type: 'Другое',
+    containers: inherited,
+  };
   // Insert before final point if there are ≥2; else append.
   if (pts.length >= 2) {
     pts.splice(pts.length - 1, 0, newPt);
@@ -1318,8 +1371,8 @@ function reLabelPoints() {
   const pts = _currentJson.points || [];
   pts.forEach((p, i) => {
     p.order = i + 1;
-    if (i === 0) p.label = 'A';
-    else if (i === pts.length - 1) p.label = 'B';
+    if (i === 0) p.label = 'А';                              // кириллическая А
+    else if (i === pts.length - 1) p.label = 'Б';            // кириллическая Б (NewTask.pdf §2.2)
     else p.label = String(i);
   });
 }
