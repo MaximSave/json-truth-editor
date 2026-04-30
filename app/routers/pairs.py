@@ -380,6 +380,7 @@ _TEMPLATE_CONTAINER = {
     "isUnnumbered": False,
     "status": "Гружёный",
     "cargoWeight": None,
+    "cargo": None,
     "pinCode": None,
     "comment": None,
 }

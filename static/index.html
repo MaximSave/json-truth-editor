@@ -1132,6 +1132,7 @@ function renderContainerCardV2(c, path, ci, pointIdx, compact) {
         ${rawInput(`${path}.cargoWeight`, c.cargoWeight, 'number', 'кг')}
       </div>
     </div>
+    ${formField('cargo', c.cargo, 'text', 'Наименование груза (Крупа, Пеллеты, Прокладки и т.п.)', path)}
     ${formField('comment', c.comment, 'textarea', 'комментарий к контейнеру', path)}
   </div>`;
 }
@@ -1140,6 +1141,7 @@ function buildContainerSummary(c) {
   const parts = [];
   if (c.isUnnumbered) parts.push(`PIN: ${c.pinCode || '—'}`);
   else if (c.containerNumber) parts.push(c.containerNumber);
+  if (c.cargo) parts.push(`«${c.cargo}»`);
   if (c.containerSize) parts.push(c.containerSize);
   if (c.containerType) parts.push(c.containerType);
   // Status-summary: новый словарь NewTask.pdf (Порожний/Гружёный) +
